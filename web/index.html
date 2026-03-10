@@ -377,7 +377,7 @@ const App = (() => {
 
     // Current file line (only while running)
     const currentHtml = (!isDone && fp.current_file)
-      ? `<div class="file-progress-current">Encoding: <span>${escapeHtml(fp.current_file)}</span></div>`
+      ? `<div class="file-progress-current">Encoding ${processed} of ${total}: <span>${escapeHtml(fp.current_file)}</span></div>`
       : '';
 
     // Per-file list (always rendered if files array is present; toggle is controlled by JS)

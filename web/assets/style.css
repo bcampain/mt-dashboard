@@ -541,19 +541,26 @@ td.dur-cell  { color: var(--muted); font-size: 12px; white-space: nowrap; }
   display: flex;
   flex-direction: column;
   gap: 8px;
+  overflow: hidden;
 }
 #detail-file-progress .file-progress-wrap {
   margin: 0;
   background: var(--surface);
 }
+#detail-file-progress .file-progress-label { font-size: 13px; }
+#detail-file-progress .file-progress-count { font-size: 12px; }
 #detail-file-progress .file-progress-current {
+  font-size: 12px;
   max-width: 100%;
 }
+#detail-file-progress .file-progress-current span { font-size: 12px; }
 
 /* ── Log pane ─────────────────────────────────────────────────── */
 .detail-log {
   display: flex;
   flex-direction: column;
+  min-width: 0; /* prevent grid column from overflowing its 1fr allocation */
+  overflow: hidden;
 }
 .log-toolbar {
   display: flex;
