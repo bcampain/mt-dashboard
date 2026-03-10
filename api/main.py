@@ -89,7 +89,10 @@ def _count_kind_dir(root: Path) -> dict:
         return sum(
             1 for f in p.rglob("*")
             if f.is_file()
-            and not f.name.startswith(".")   # skip .DS_Store, ._sidecar.mp4, etc.
+            # Skip any file where a path component starts with "." — catches bare
+            # dotfiles (._sidecar.mp4, .DS_Store) AND files inside hidden dirs
+            # like .Trashes/501/film.mp4 or .TemporaryItems/upload.mov.
+            and not any(part.startswith(".") for part in f.relative_to(p).parts)
             and f.suffix.lower() in VIDEO_EXTS
         )
 
