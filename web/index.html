@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>mt-dashboard</title>
+  <link rel="stylesheet" href="/assets/style.css" />
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="logo">mt<span>-dashboard</span></div>
+    <div class="spacer"></div>
+    <div id="live-dot" title="Live updates"></div>
+    <div id="last-updated">–</div>
+    <button onclick="App.refresh()" title="Refresh now">↻ Refresh</button>
+  </header>
+
+  <main>
+    <!-- Stats row -->
+    <div class="stats-grid">
+      <div class="stat-card" id="stat-incoming">
+        <div class="label">⬇ Incoming</div>
+        <div class="total" id="stat-incoming-total">–</div>
+        <div class="breakdown" id="stat-incoming-breakdown"></div>
+      </div>
+      <div class="stat-card" id="stat-staging">
+        <div class="label">⚙ Staging</div>
+        <div class="total" id="stat-staging-total">–</div>
+        <div class="breakdown" id="stat-staging-breakdown"></div>
+      </div>
+      <div class="stat-card" id="stat-library">
+        <div class="label">📚 Library</div>
+        <div class="total" id="stat-library-total">–</div>
+        <div class="breakdown" id="stat-library-breakdown"></div>
+      </div>
+      <div class="stat-card active-card" id="stat-active">
+        <div class="label">⚡ Active Runs</div>
+        <div class="total" id="stat-active-total">0</div>
+        <div class="breakdown" id="stat-active-breakdown">No active runs</div>
+      </div>
+    </div>
+
+    <!-- Active run banner -->
+    <div id="active-banner" onclick="App.selectActiveRun()">
+      <div class="banner-pulse"></div>
+      <div class="banner-text">
+        <div><strong>Pipeline running</strong> · <span id="banner-run-id">–</span></div>
+        <div class="banner-meta" id="banner-meta">–</div>
+      </div>
+      <div class="banner-step-track" id="banner-steps"></div>
+    </div>
+
+    <!-- Runs list -->
+    <div class="section-header">
+      <h2>Pipeline Runs</h2>
+      <div class="actions">
+        <select id="filter-kind" class="filter-select" onchange="App.applyFilter()">
+          <option value="">All kinds</option>
+          <option value="tv">TV</option>
+          <option value="movies">Movies</option>
+          <option value="clips">Clips</option>
+        </select>
+        <select id="filter-status" class="filter-select" onchange="App.applyFilter()">
+          <option value="">All statuses</option>
+          <option value="running">Running</option>
+          <option value="complete">Complete</option>
+          <option value="failed">Failed</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="runs-wrap">
+      <table id="runs-table">
+        <thead>
+          <tr>
+            <th>Run ID</th>
+            <th>Kind</th>
+            <th>Target</th>
+            <th>Status</th>
+            <th>Steps</th>
+            <th>Started</th>
+            <th>Duration</th>
+          </tr>
+        </thead>
+        <tbody id="runs-body">
+          <tr><td colspan="7"><div class="empty-state"><div class="icon">📭</div><p>No pipeline runs found in <code>/logs/runs/</code></p></div></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Detail panel (inline below table) -->
+    <div id="detail-panel">
+      <div class="detail-header">
+        <h3 id="detail-run-id">–</h3>
+        <div id="detail-status-badge"></div>
+        <div class="spacer"></div>
+        <button class="close-btn" onclick="App.closeDetail()" title="Close">✕</button>
+      </div>
+      <div class="detail-body">
+        <div class="detail-meta" id="detail-meta-content">
+          <!-- Populated by JS -->
+        </div>
+        <div class="detail-log">
+          <div class="log-toolbar">
+            <span id="log-info">Log</span>
+            <div class="spacer"></div>
+            <button id="log-scroll-btn" onclick="App.toggleAutoScroll()">⬇ Auto-scroll</button>
+            <button id="log-refresh-btn" onclick="App.refreshLog()">↻</button>
+          </div>
+          <div class="log-content" id="log-content"></div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div id="error-toast"></div>
+
+<script>
+/* ──────────────────────────────────────────────────────────────────────────
+   mt-dashboard SPA
+   ────────────────────────────────────────────────────────────────────────── */
+const App = (() => {
+  // State
+  let runs = [];
+  let filteredRuns = [];
+  let selectedRunId = null;
+  let autoScroll = true;
+  let logEventSource = null;
+  let globalEventSource = null;
+  let statsInterval = null;
+  let runsInterval = null;
+
+  // ── Utilities ────────────────────────────────────────────────────────────
+
+  function fmt(dt) {
+    if (!dt) return '–';
+    const d = new Date(dt);
+    const pad = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} `
+         + `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  }
+
+  function fmtDuration(startedAt, completedAt) {
+    const start = startedAt ? new Date(startedAt) : null;
+    const end   = completedAt ? new Date(completedAt) : null;
+    if (!start) return '–';
+    const ms = (end || Date.now()) - start.getTime();
+    if (ms < 0) return '–';
+    const s = Math.floor(ms / 1000);
+    if (s < 60) return `${s}s`;
+    const m = Math.floor(s / 60);
+    if (m < 60) return `${m}m ${s % 60}s`;
+    const h = Math.floor(m / 60);
+    return `${h}h ${m % 60}m`;
+  }
+
+  function el(id) { return document.getElementById(id); }
+
+  function showError(msg) {
+    const t = el('error-toast');
+    t.textContent = msg;
+    t.classList.add('visible');
+    setTimeout(() => t.classList.remove('visible'), 5000);
+  }
+
+  function colorizeLogLine(line) {
+    if (!line) return '<span class="log-line dim"> </span>';
+    const esc = line.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    if (/\[ERROR\]/i.test(esc)) return `<span class="log-line error">${esc}</span>`;
+    if (/\[WARN\]/i.test(esc))  return `<span class="log-line warn">${esc}</span>`;
+    return `<span class="log-line info">${esc}</span>`;
+  }
+
+  // ── Stats ────────────────────────────────────────────────────────────────
+
+  async function fetchStats() {
+    try {
+      const r = await fetch('/api/stats');
+      if (!r.ok) return;
+      const data = await r.json();
+      renderStats(data);
+    } catch (e) { /* silently skip */ }
+  }
+
+  function renderStats(data) {
+    for (const [key, name] of [['incoming','stat-incoming'], ['staging','stat-staging'], ['library','stat-library']]) {
+      const d = data[key] || {};
+      const totalEl = el(`${name}-total`);
+      const breakEl = el(`${name}-breakdown`);
+      if (!d.exists) {
+        el(name).classList.add('na');
+        totalEl.textContent = 'n/a';
+        breakEl.textContent = 'Not mounted';
+        continue;
+      }
+      el(name).classList.remove('na');
+      totalEl.textContent = d.total;
+      breakEl.innerHTML =
+        `<span class="kind">📺 ${d.tv} shows</span>` +
+        `<span class="kind">🎬 ${d.movies} movies</span>` +
+        `<span class="kind">✂️ ${d.clips} clips</span>`;
+    }
+  }
+
+  // ── Runs ─────────────────────────────────────────────────────────────────
+
+  async function fetchRuns() {
+    try {
+      const r = await fetch('/api/runs');
+      if (!r.ok) { showError(`Failed to fetch runs: ${r.status}`); return; }
+      runs = await r.json();
+      applyFilter();
+      updateActiveBanner();
+      updateActiveCount();
+      updateLiveDot();
+      el('last-updated').textContent = 'Updated ' + new Date().toLocaleTimeString();
+    } catch (e) {
+      showError('Could not reach mt-dashboard API');
+    }
+  }
+
+  function applyFilter() {
+    const kind   = el('filter-kind').value;
+    const status = el('filter-status').value;
+    filteredRuns = runs.filter(r =>
+      (!kind   || r.kind   === kind)   &&
+      (!status || r.status === status)
+    );
+    renderRunsTable(filteredRuns);
+  }
+
+  function renderRunsTable(list) {
+    const tbody = el('runs-body');
+    if (!list.length) {
+      tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><div class="icon">📭</div><p>No runs match the current filters.</p></div></td></tr>`;
+      return;
+    }
+    tbody.innerHTML = list.map(run => {
+      const target = run.target || '–';
+      const shortTarget = target.length > 48 ? '…' + target.slice(-46) : target;
+      const isSelected = run.run_id === selectedRunId;
+      return `<tr class="${isSelected ? 'selected' : ''}" onclick="App.selectRun('${run.run_id}')">
+        <td class="run-id">${run.run_id}</td>
+        <td><span class="badge kind-${run.kind || ''}">${run.kind || '–'}</span></td>
+        <td class="target-cell" title="${escapeAttr(target)}">${escapeHtml(shortTarget)}</td>
+        <td><span class="badge status-${run.status}">${run.status}</span></td>
+        <td>${renderMiniSteps(run)}</td>
+        <td class="time-cell">${fmt(run.started_at)}</td>
+        <td class="dur-cell">${fmtDuration(run.started_at, run.completed_at)}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  function renderMiniSteps(run) {
+    const planned = run.steps_planned || [];
+    const steps   = run.steps || [];
+    return `<div class="mini-steps">${planned.map(name => {
+      const s = steps.find(s => s.name === name) || { status: 'pending' };
+      return `<div class="mini-step ${s.status}" title="${name}: ${s.status}"></div>`;
+    }).join('')}</div>`;
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+  function escapeAttr(s) {
+    return String(s).replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  }
+
+  // ── Active banner ─────────────────────────────────────────────────────────
+
+  function updateActiveBanner() {
+    const active = runs.find(r => r.status === 'running');
+    const banner = el('active-banner');
+    if (!active) { banner.classList.remove('visible'); return; }
+
+    banner.classList.add('visible');
+    el('banner-run-id').textContent = active.run_id;
+    el('banner-meta').textContent =
+      `${active.kind || '?'} · ${active.target || '?'} · started ${fmt(active.started_at)}`;
+
+    const steps = active.steps || [];
+    el('banner-steps').innerHTML = steps.map((s, i) =>
+      (i > 0 ? '<span class="step-arrow">›</span>' : '') +
+      `<span class="step-pill ${s.status}">${s.name}</span>`
+    ).join('');
+  }
+
+  function updateActiveCount() {
+    const active = runs.filter(r => r.status === 'running');
+    el('stat-active-total').textContent = active.length;
+    el('stat-active-breakdown').textContent = active.length
+      ? active.map(r => r.run_id).join(', ')
+      : 'No active runs';
+  }
+
+  function updateLiveDot() {
+    const hasRunning = runs.some(r => r.status === 'running');
+    el('live-dot').classList.toggle('live', hasRunning);
+  }
+
+  function selectActiveRun() {
+    const active = runs.find(r => r.status === 'running');
+    if (active) selectRun(active.run_id);
+  }
+
+  // ── Detail panel ─────────────────────────────────────────────────────────
+
+  async function selectRun(runId) {
+    if (selectedRunId === runId) {
+      closeDetail();
+      return;
+    }
+    selectedRunId = runId;
+    renderRunsTable(filteredRuns); // highlight selected row
+
+    const run = runs.find(r => r.run_id === runId);
+    if (!run) return;
+
+    const panel = el('detail-panel');
+    panel.classList.add('visible');
+    panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    el('detail-run-id').textContent = run.run_id;
+    el('detail-status-badge').innerHTML = `<span class="badge status-${run.status}">${run.status}</span>`;
+
+    renderDetailMeta(run);
+    await loadLog(run);
+
+    // If running, open SSE stream
+    if (run.status === 'running') {
+      startLogStream(runId);
+    }
+  }
+
+  function renderDetailMeta(run) {
+    const steps = run.steps || [];
+
+    const timelineHtml = steps.map(s => {
+      const icon = s.status === 'complete' ? '✓'
+                 : s.status === 'failed'   ? '✗'
+                 : s.status === 'running'  ? '…'
+                 : '';
+      return `<div class="timeline-item">
+        <div class="timeline-icon ${s.status}">${icon}</div>
+        <div class="timeline-content">
+          <div class="step-name">${s.name}</div>
+          ${s.started_at
+            ? `<div class="step-time">Started: ${fmt(s.started_at)}</div>`
+            : '<div class="step-time">Not started</div>'}
+          ${s.completed_at
+            ? `<div class="step-dur">Duration: ${fmtDuration(s.started_at, s.completed_at)}</div>`
+            : (s.status === 'running'
+              ? `<div class="step-dur">Running for ${fmtDuration(s.started_at, null)}…</div>`
+              : '')}
+        </div>
+      </div>`;
+    }).join('');
+
+    el('detail-meta-content').innerHTML = `
+      <div class="meta-section">
+        <h4>Run Metadata</h4>
+        <div class="meta-row"><span class="key">Run ID</span><span class="val">${run.run_id}</span></div>
+        <div class="meta-row"><span class="key">Kind</span><span class="val">${run.kind || '–'}</span></div>
+        <div class="meta-row"><span class="key">Target mode</span><span class="val">${run.target_mode || '–'}</span></div>
+        <div class="meta-row"><span class="key">Started</span><span class="val">${fmt(run.started_at)}</span></div>
+        ${run.completed_at ? `<div class="meta-row"><span class="key">Completed</span><span class="val">${fmt(run.completed_at)}</span></div>` : ''}
+        <div class="meta-row"><span class="key">Duration</span><span class="val">${fmtDuration(run.started_at, run.completed_at)}</span></div>
+        ${run.exit_code != null ? `<div class="meta-row"><span class="key">Exit code</span><span class="val">${run.exit_code}</span></div>` : ''}
+        ${run.dry_run ? `<div class="meta-row"><span class="key">Dry run</span><span class="val">yes</span></div>` : ''}
+      </div>
+      <div class="meta-section">
+        <h4>Paths</h4>
+        <div class="meta-row"><span class="key">Target (incoming)</span><span class="val">${escapeHtml(run.target || '–')}</span></div>
+        <div class="meta-row"><span class="key">Staging target</span><span class="val">${escapeHtml(run.staging_target || '–')}</span></div>
+        <div class="meta-row"><span class="key">Log file</span><span class="val">${escapeHtml(run.log_file || '–')}</span></div>
+      </div>
+      <div class="meta-section">
+        <h4>Steps</h4>
+        <div class="step-timeline">${timelineHtml || '<div style="color:var(--muted);font-size:12px;">No steps</div>'}</div>
+      </div>
+    `;
+  }
+
+  async function loadLog(run) {
+    const logEl = el('log-content');
+    logEl.innerHTML = '<span style="color:var(--muted)">Loading log…</span>';
+
+    stopLogStream();
+
+    try {
+      const r = await fetch(`/api/runs/${run.run_id}/log?lines=600`);
+      if (!r.ok) { logEl.innerHTML = '<span style="color:var(--error)">Could not load log.</span>'; return; }
+      const data = await r.json();
+      if (!data.lines.length && !data.log_file) {
+        logEl.innerHTML = '<span style="color:var(--muted)">No log file found for this run.</span>';
+        return;
+      }
+      if (!data.lines.length) {
+        logEl.innerHTML = '<span style="color:var(--muted)">Log file is empty or not yet created.</span>';
+        el('log-info').textContent = `Log · 0 lines`;
+        return;
+      }
+      logEl.innerHTML = data.lines.map(colorizeLogLine).join('\n');
+      el('log-info').textContent = `Log · ${data.total_lines} lines`;
+      if (autoScroll) logEl.scrollTop = logEl.scrollHeight;
+    } catch (e) {
+      logEl.innerHTML = '<span style="color:var(--error)">Error fetching log.</span>';
+    }
+  }
+
+  // ── SSE log streaming ─────────────────────────────────────────────────────
+
+  function startLogStream(runId) {
+    stopLogStream();
+    const logEl = el('log-content');
+    logEventSource = new EventSource(`/api/runs/${runId}/log/stream`);
+
+    logEventSource.addEventListener('log_line', e => {
+      try {
+        const { line } = JSON.parse(e.data);
+        const span = document.createElement('span');
+        span.innerHTML = colorizeLogLine(line) + '\n';
+        logEl.appendChild(span);
+        const totalLines = logEl.querySelectorAll('.log-line').length;
+        el('log-info').textContent = `Log · ${totalLines} lines (live)`;
+        if (autoScroll) logEl.scrollTop = logEl.scrollHeight;
+      } catch (err) { /* skip */ }
+    });
+
+    logEventSource.addEventListener('run_done', e => {
+      try {
+        stopLogStream();
+        // Refresh run data to get final state
+        fetchRuns().then(() => {
+          const updated = runs.find(r => r.run_id === selectedRunId);
+          if (updated) {
+            el('detail-status-badge').innerHTML = `<span class="badge status-${updated.status}">${updated.status}</span>`;
+            renderDetailMeta(updated);
+          }
+        });
+      } catch (err) { /* skip */ }
+    });
+
+    logEventSource.onerror = () => {
+      stopLogStream();
+    };
+  }
+
+  function stopLogStream() {
+    if (logEventSource) { logEventSource.close(); logEventSource = null; }
+  }
+
+  // ── Global manifest-change SSE ────────────────────────────────────────────
+
+  function startGlobalEvents() {
+    if (globalEventSource) return;
+    globalEventSource = new EventSource('/api/events');
+    globalEventSource.addEventListener('runs_updated', () => {
+      fetchRuns();
+    });
+    globalEventSource.onerror = () => {
+      // SSE auto-reconnects; we'll survive a brief server restart
+    };
+  }
+
+  // ── Public API ────────────────────────────────────────────────────────────
+
+  function refresh() {
+    fetchStats();
+    fetchRuns();
+    if (selectedRunId) {
+      const run = runs.find(r => r.run_id === selectedRunId);
+      if (run) loadLog(run);
+    }
+  }
+
+  function refreshLog() {
+    const run = runs.find(r => r.run_id === selectedRunId);
+    if (run) loadLog(run);
+  }
+
+  function closeDetail() {
+    selectedRunId = null;
+    stopLogStream();
+    el('detail-panel').classList.remove('visible');
+    renderRunsTable(filteredRuns);
+  }
+
+  function toggleAutoScroll() {
+    autoScroll = !autoScroll;
+    el('log-scroll-btn').textContent = autoScroll ? '⬇ Auto-scroll' : '⏸ Paused';
+    el('log-scroll-btn').style.color = autoScroll ? '' : 'var(--warning)';
+    if (autoScroll) el('log-content').scrollTop = el('log-content').scrollHeight;
+  }
+
+  // ── Init ──────────────────────────────────────────────────────────────────
+
+  function init() {
+    fetchStats();
+    fetchRuns();
+    startGlobalEvents();
+
+    // Polling fallback in case SSE misses an update
+    runsInterval  = setInterval(fetchRuns,  5000);
+    statsInterval = setInterval(fetchStats, 15000);
+  }
+
+  document.addEventListener('DOMContentLoaded', init);
+
+  return { refresh, selectRun, selectActiveRun, closeDetail,
+           applyFilter, toggleAutoScroll, refreshLog };
+})();
+</script>
+</body>
+</html>

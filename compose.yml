@@ -1,0 +1,42 @@
+# mt-dashboard — compose.yml
+#
+# Spins up the dashboard web server and mounts the same media volumes as the
+# media-tools container, all read-only.  The only writable state is the logs
+# directory (the .NET app writes there; the dashboard only reads it).
+#
+# Usage:
+#   docker compose up -d          # start in background
+#   docker compose logs -f        # follow logs
+#   docker compose down           # stop
+#
+# The dashboard is available at http://<host-ip>:8080 on the local network.
+# Do NOT expose port 8080 to the internet — no authentication is included.
+
+services:
+  mt-dashboard:
+    build: .
+    image: mt-dashboard:latest
+    container_name: mt-dashboard
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      # Read-only mounts — the .NET app owns all of these paths.
+      # Adjust host paths to match your media-tools compose.yml.
+      - /srv/media/logs:/logs:ro
+      - /srv/media/incoming:/incoming:ro
+      - /srv/media/staging:/staging:ro
+      - /srv/media/library:/library:ro
+    environment:
+      - TZ=America/Chicago
+      # Override any path if your layout differs:
+      # - LOGS_DIR=/logs
+      # - INCOMING_DIR=/incoming
+      # - STAGING_DIR=/staging
+      # - LIBRARY_DIR=/library
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/api/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
