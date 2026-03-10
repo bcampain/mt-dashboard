@@ -445,6 +445,7 @@ td.dur-cell  { color: var(--muted); font-size: 12px; white-space: nowrap; }
 .log-content {
   flex: 1;
   overflow-y: auto;
+  overflow-x: auto;
   padding: 10px 14px;
   font-family: var(--font-mono);
   font-size: 12px;
@@ -453,7 +454,7 @@ td.dur-cell  { color: var(--muted); font-size: 12px; white-space: nowrap; }
   min-height: 300px;
   max-height: 520px;
 }
-.log-content .log-line { white-space: pre-wrap; word-break: break-all; }
+.log-content .log-line { display: block; white-space: pre; }
 .log-content .log-line.info  { color: #c9d1d9; }
 .log-content .log-line.warn  { color: #d29922; }
 .log-content .log-line.error { color: #f85149; }
