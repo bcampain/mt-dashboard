@@ -357,6 +357,7 @@ td.dur-cell  { color: var(--muted); font-size: 12px; white-space: nowrap; }
   border-right: 1px solid var(--border);
   padding: 16px;
   overflow-y: auto;
+  overflow-x: hidden;
 }
 .meta-section { margin-bottom: 20px; }
 .meta-section h4 {
@@ -530,6 +531,23 @@ td.dur-cell  { color: var(--muted); font-size: 12px; white-space: nowrap; }
   color: var(--accent);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+/* ── File progress above log ──────────────────────────────────── */
+#detail-file-progress:not(:empty) {
+  border-bottom: 1px solid var(--border);
+  padding: 10px 14px;
+  background: var(--surface-2);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+#detail-file-progress .file-progress-wrap {
+  margin: 0;
+  background: var(--surface);
+}
+#detail-file-progress .file-progress-current {
+  max-width: 100%;
 }
 
 /* ── Log pane ─────────────────────────────────────────────────── */

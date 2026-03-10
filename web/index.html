@@ -104,6 +104,7 @@
           <!-- Populated by JS -->
         </div>
         <div class="detail-log">
+          <div id="detail-file-progress"></div>
           <div class="log-toolbar">
             <span id="log-info">Log</span>
             <div class="spacer"></div>
@@ -408,9 +409,10 @@ const App = (() => {
         <div class="file-list ${isOpen ? 'visible' : ''}" id="${listId}">${items}</div>`;
     }
 
+    const stepLabel = stepName.charAt(0).toUpperCase() + stepName.slice(1);
     return `<div class="file-progress-wrap">
       <div class="file-progress-header">
-        <span class="file-progress-label">Files</span>
+        <span class="file-progress-label">${stepLabel} Files</span>
         <span class="file-progress-count">${label}${hasErrors ? ` · ${failed} failed` : ''}</span>
       </div>
       <div class="file-progress-bar-track">
@@ -441,9 +443,6 @@ const App = (() => {
                  : s.status === 'running'  ? '…'
                  : '';
 
-      // File progress widget — rendered for any step that has file_progress data
-      const fpHtml = renderFileProgress(s.name, s.file_progress, s.status);
-
       return `<div class="timeline-item">
         <div class="timeline-icon ${s.status}">${icon}</div>
         <div class="timeline-content">
@@ -456,10 +455,16 @@ const App = (() => {
             : (s.status === 'running'
               ? `<div class="step-dur">Running for ${fmtDuration(s.started_at, null)}…</div>`
               : '')}
-          ${fpHtml}
         </div>
       </div>`;
     }).join('');
+
+    // File progress widgets — rendered above the log pane for any step with file data
+    const fpHtml = steps
+      .filter(s => s.file_progress && s.file_progress.total_files > 0)
+      .map(s => renderFileProgress(s.name, s.file_progress, s.status))
+      .join('');
+    el('detail-file-progress').innerHTML = fpHtml;
 
     el('detail-meta-content').innerHTML = `
       <div class="meta-section">
@@ -586,6 +591,7 @@ const App = (() => {
     _fpToggleState = {};
     stopLogStream();
     el('detail-panel').classList.remove('visible');
+    el('detail-file-progress').innerHTML = '';
     renderRunsTable(filteredRuns);
   }
 
