@@ -86,12 +86,17 @@ def _count_kind_dir(root: Path) -> dict:
     def count_videos(p: Path) -> int:
         if not p.exists():
             return 0
-        return sum(1 for f in p.rglob("*") if f.is_file() and f.suffix.lower() in VIDEO_EXTS)
+        return sum(
+            1 for f in p.rglob("*")
+            if f.is_file()
+            and not f.name.startswith(".")   # skip .DS_Store, ._sidecar.mp4, etc.
+            and f.suffix.lower() in VIDEO_EXTS
+        )
 
     def count_shows(p: Path) -> int:
         if not p.exists():
             return 0
-        return sum(1 for d in p.iterdir() if d.is_dir())
+        return sum(1 for d in p.iterdir() if d.is_dir() and not d.name.startswith("."))
 
     if not root.exists():
         return {"exists": False, "tv": 0, "movies": 0, "clips": 0, "total": 0}
