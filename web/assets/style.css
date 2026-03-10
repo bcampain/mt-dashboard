@@ -67,6 +67,7 @@ header {
   align-items: center;
   gap: 16px;
   padding: 12px 24px;
+  padding-top: calc(12px + env(safe-area-inset-top));
   background: var(--surface);
   border-bottom: 1px solid var(--border);
   position: sticky;
