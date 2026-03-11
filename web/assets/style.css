@@ -454,16 +454,16 @@ td.dur-cell  { color: var(--muted); font-size: 12px; white-space: nowrap; }
 }
 /* Progress bar track */
 .file-progress-bar-track {
-  height: 6px;
-  background: var(--surface);
-  border-radius: 3px;
+  height: 8px;
+  background: var(--border);
+  border-radius: 4px;
   overflow: hidden;
   margin-bottom: 6px;
 }
 /* Progress bar fill — width set inline via JS */
 .file-progress-bar-fill {
   height: 100%;
-  border-radius: 3px;
+  border-radius: 4px;
   transition: width 0.4s ease;
   background: linear-gradient(90deg, var(--accent) 0%, var(--success) 100%);
 }
