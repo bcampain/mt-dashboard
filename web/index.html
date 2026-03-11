@@ -104,6 +104,7 @@
           <!-- Populated by JS -->
         </div>
         <div class="detail-log">
+          <div id="detail-file-progress"></div>
           <div class="log-toolbar">
             <span id="log-info">Log</span>
             <div class="spacer"></div>
@@ -218,6 +219,13 @@ const App = (() => {
       updateActiveCount();
       updateLiveDot();
       el('last-updated').textContent = 'Updated ' + new Date().toLocaleTimeString();
+
+      // If the detail panel is open for a run that's still in the list, re-render
+      // its metadata section so file progress bars update live when SSE fires.
+      if (selectedRunId) {
+        const updated = runs.find(r => r.run_id === selectedRunId);
+        if (updated) updateDetailPanel(updated);
+      }
     } catch (e) {
       showError('Could not reach mt-dashboard API');
     }
@@ -270,6 +278,7 @@ const App = (() => {
   function escapeAttr(s) {
     return String(s).replace(/"/g,'&quot;').replace(/'/g,'&#39;');
   }
+  function plural(n, word) { return `${word}${n !== 1 ? 's' : ''}`; }
 
   // ── Active banner ─────────────────────────────────────────────────────────
 
@@ -284,10 +293,16 @@ const App = (() => {
       `${active.kind || '?'} · ${active.target || '?'} · started ${fmt(active.started_at)}`;
 
     const steps = active.steps || [];
-    el('banner-steps').innerHTML = steps.map((s, i) =>
-      (i > 0 ? '<span class="step-arrow">›</span>' : '') +
-      `<span class="step-pill ${s.status}">${s.name}</span>`
-    ).join('');
+
+    // Show step pills; if the running step has file progress, append a count badge
+    el('banner-steps').innerHTML = steps.map((s, i) => {
+      const fp = s.file_progress;
+      const fileCountBadge = (s.status === 'running' && fp && fp.total_files > 0)
+        ? `<span class="banner-file-progress">&nbsp;${fp.current_file ? fp.processed_files + 1 : fp.processed_files}/${fp.total_files}</span>`
+        : '';
+      return (i > 0 ? '<span class="step-arrow">›</span>' : '') +
+        `<span class="step-pill ${s.status}">${s.name}</span>${fileCountBadge}`;
+    }).join('');
   }
 
   function updateActiveCount() {
@@ -326,9 +341,7 @@ const App = (() => {
     panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
     el('detail-run-id').textContent = run.run_id;
-    el('detail-status-badge').innerHTML = `<span class="badge status-${run.status}">${run.status}</span>`;
-
-    renderDetailMeta(run);
+    updateDetailPanel(run);
     await loadLog(run);
 
     // If running, open SSE stream
@@ -336,6 +349,94 @@ const App = (() => {
       startLogStream(runId);
     }
   }
+
+  function updateDetailPanel(run) {
+    el('detail-status-badge').innerHTML = `<span class="badge status-${run.status}">${run.status}</span>`;
+    renderDetailMeta(run);
+  }
+
+  // ── File progress widget ──────────────────────────────────────────────────
+
+  // Unique ID counter for per-step file list toggle state
+  let _fpToggleState = {};
+
+  function renderFileProgress(stepName, fp, stepStatus) {
+    if (!fp || fp.total_files === 0) return '';
+
+    const processed = fp.processed_files || 0;
+    const total     = fp.total_files;
+    const failed    = fp.failed_files || 0;
+    const pct       = Math.round((processed / total) * 100);
+    const hasErrors = failed > 0;
+    const isDone    = stepStatus === 'complete' || stepStatus === 'failed';
+
+    // When a file is actively encoding, it counts as "in progress" (processed + 1)
+    const inProgress = !isDone && fp.current_file;
+    const displayIdx = inProgress ? processed + 1 : processed;
+
+    // Label: "7 of 12 files · 58%" (running) or "12 of 12 files" (done)
+    const label = isDone
+      ? `${processed} of ${total} ${plural(total, 'file')} processed`
+      : `${displayIdx} of ${total} ${plural(total, 'file')} · ${pct}%`;
+
+    // Current file line (only while running)
+    const currentHtml = inProgress
+      ? `<div class="file-progress-current">Encoding ${displayIdx} of ${total}: <span>${escapeHtml(fp.current_file)}</span></div>`
+      : '';
+
+    // Per-file list (always rendered if files array is present; toggle is controlled by JS)
+    const toggleId = `fl-${stepName}`;
+    const listId   = `fll-${stepName}`;
+    const isOpen   = _fpToggleState[stepName] || false;
+
+    let fileListHtml = '';
+    if (fp.files && fp.files.length > 0) {
+      const items = fp.files.map(f => {
+        const name = f.input_path ? f.input_path.split('/').pop() : '?';
+        const dur  = (f.started_at && f.completed_at)
+          ? ` · ${fmtDuration(f.started_at, f.completed_at)}`
+          : (f.status === 'running' && f.started_at)
+            ? ` · ${fmtDuration(f.started_at, null)}…`
+            : '';
+        return `<div class="file-item ${f.status}">
+          <div class="file-dot ${f.status}"></div>
+          <span>${escapeHtml(name)}${dur}</span>
+        </div>`;
+      }).join('');
+
+      fileListHtml = `
+        <div class="file-list-toggle ${isOpen ? 'open' : ''}" id="${toggleId}"
+             onclick="App.toggleFileList('${stepName}')">
+          <span class="toggle-arrow">▶</span>
+          ${plural(fp.files.length, 'file')}
+        </div>
+        <div class="file-list ${isOpen ? 'visible' : ''}" id="${listId}">${items}</div>`;
+    }
+
+    const stepLabel = stepName.charAt(0).toUpperCase() + stepName.slice(1);
+    return `<div class="file-progress-wrap">
+      <div class="file-progress-header">
+        <span class="file-progress-label">${stepLabel} Files</span>
+        <span class="file-progress-count">${label}${hasErrors ? ` · ${failed} failed` : ''}</span>
+      </div>
+      <div class="file-progress-bar-track">
+        <div class="file-progress-bar-fill ${hasErrors ? 'has-failures' : ''}"
+             style="width:${pct}%"></div>
+      </div>
+      ${currentHtml}
+      ${fileListHtml}
+    </div>`;
+  }
+
+  function toggleFileList(stepName) {
+    _fpToggleState[stepName] = !_fpToggleState[stepName];
+    const toggle  = document.getElementById(`fl-${stepName}`);
+    const list    = document.getElementById(`fll-${stepName}`);
+    if (toggle) toggle.classList.toggle('open', _fpToggleState[stepName]);
+    if (list)   list.classList.toggle('visible', _fpToggleState[stepName]);
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
 
   function renderDetailMeta(run) {
     const steps = run.steps || [];
@@ -345,6 +446,7 @@ const App = (() => {
                  : s.status === 'failed'   ? '✗'
                  : s.status === 'running'  ? '…'
                  : '';
+
       return `<div class="timeline-item">
         <div class="timeline-icon ${s.status}">${icon}</div>
         <div class="timeline-content">
@@ -360,6 +462,13 @@ const App = (() => {
         </div>
       </div>`;
     }).join('');
+
+    // File progress widgets — rendered above the log pane for any step with file data
+    const fpHtml = steps
+      .filter(s => s.file_progress && s.file_progress.total_files > 0)
+      .map(s => renderFileProgress(s.name, s.file_progress, s.status))
+      .join('');
+    el('detail-file-progress').innerHTML = fpHtml;
 
     el('detail-meta-content').innerHTML = `
       <div class="meta-section">
@@ -438,10 +547,7 @@ const App = (() => {
         // Refresh run data to get final state
         fetchRuns().then(() => {
           const updated = runs.find(r => r.run_id === selectedRunId);
-          if (updated) {
-            el('detail-status-badge').innerHTML = `<span class="badge status-${updated.status}">${updated.status}</span>`;
-            renderDetailMeta(updated);
-          }
+          if (updated) updateDetailPanel(updated);
         });
       } catch (err) { /* skip */ }
     });
@@ -486,8 +592,10 @@ const App = (() => {
 
   function closeDetail() {
     selectedRunId = null;
+    _fpToggleState = {};
     stopLogStream();
     el('detail-panel').classList.remove('visible');
+    el('detail-file-progress').innerHTML = '';
     renderRunsTable(filteredRuns);
   }
 
@@ -513,7 +621,7 @@ const App = (() => {
   document.addEventListener('DOMContentLoaded', init);
 
   return { refresh, selectRun, selectActiveRun, closeDetail,
-           applyFilter, toggleAutoScroll, refreshLog };
+           applyFilter, toggleAutoScroll, refreshLog, toggleFileList };
 })();
 </script>
 </body>

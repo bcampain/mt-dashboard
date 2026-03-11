@@ -357,6 +357,7 @@ td.dur-cell  { color: var(--muted); font-size: 12px; white-space: nowrap; }
   border-right: 1px solid var(--border);
   padding: 16px;
   overflow-y: auto;
+  overflow-x: hidden;
 }
 .meta-section { margin-bottom: 20px; }
 .meta-section h4 {
@@ -424,10 +425,142 @@ td.dur-cell  { color: var(--muted); font-size: 12px; white-space: nowrap; }
   color: var(--muted);
 }
 
+/* ── File progress (inside step timeline) ────────────────────── */
+.file-progress-wrap {
+  margin-top: 8px;
+  padding: 8px 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.file-progress-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+.file-progress-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text);
+}
+.file-progress-count {
+  font-size: 11px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+/* Progress bar track */
+.file-progress-bar-track {
+  height: 6px;
+  background: var(--surface);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+/* Progress bar fill — width set inline via JS */
+.file-progress-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.4s ease;
+  background: linear-gradient(90deg, var(--accent) 0%, var(--success) 100%);
+}
+.file-progress-bar-fill.has-failures {
+  background: linear-gradient(90deg, var(--accent) 0%, var(--warning) 100%);
+}
+/* Current file being encoded */
+.file-progress-current {
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 6px;
+}
+.file-progress-current span {
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+/* Collapsible per-file list */
+.file-list-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--muted);
+  cursor: pointer;
+  user-select: none;
+  margin-bottom: 4px;
+}
+.file-list-toggle:hover { color: var(--text); }
+.file-list-toggle .toggle-arrow { font-size: 9px; transition: transform 0.2s; }
+.file-list-toggle.open .toggle-arrow { transform: rotate(90deg); }
+/* Per-file status grid */
+.file-list {
+  display: none;
+  flex-direction: column;
+  gap: 3px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+.file-list.visible { display: flex; }
+.file-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  padding: 2px 0;
+}
+.file-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.file-dot.pending  { background: var(--border); }
+.file-dot.running  { background: var(--running); animation: blink 1s ease-in-out infinite; }
+.file-dot.complete { background: var(--success); }
+.file-dot.failed   { background: var(--error); }
+.file-item.running  { color: var(--text); }
+.file-item.complete { color: var(--muted); }
+.file-item.failed   { color: var(--error); }
+/* Also show progress in the active banner */
+.banner-file-progress {
+  font-size: 11px;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ── File progress above log ──────────────────────────────────── */
+#detail-file-progress:not(:empty) {
+  border-bottom: 1px solid var(--border);
+  padding: 10px 14px;
+  background: var(--surface-2);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: hidden;
+}
+#detail-file-progress .file-progress-wrap {
+  margin: 0;
+  background: var(--surface);
+}
+#detail-file-progress .file-progress-label { font-size: 13px; }
+#detail-file-progress .file-progress-count { font-size: 12px; }
+#detail-file-progress .file-progress-current {
+  font-size: 12px;
+  max-width: 100%;
+}
+#detail-file-progress .file-progress-current span { font-size: 12px; }
+
 /* ── Log pane ─────────────────────────────────────────────────── */
 .detail-log {
   display: flex;
   flex-direction: column;
+  min-width: 0; /* prevent grid column from overflowing its 1fr allocation */
+  overflow: hidden;
 }
 .log-toolbar {
   display: flex;
@@ -453,7 +586,6 @@ td.dur-cell  { color: var(--muted); font-size: 12px; white-space: nowrap; }
   line-height: 1.6;
   background: #0a0c10;
   min-height: 300px;
-  max-height: 520px;
 }
 .log-content .log-line { display: block; white-space: pre; }
 .log-content .log-line.info  { color: #c9d1d9; }
