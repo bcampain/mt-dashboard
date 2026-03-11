@@ -1,0 +1,50 @@
+# mt-dashboard — CI/CD deploy workflow
+#
+# Triggers on every push to `main` or any `feature/**` branch.
+# Runs on a self-hosted runner installed on your Linux dev server
+# (no inbound internet access required — the runner connects outbound to GitHub).
+#
+# concurrency: only one deploy at a time; a newer push cancels an in-flight one.
+
+name: Deploy
+
+on:
+  push:
+    branches:
+      - main
+      - "feature/**"
+
+concurrency:
+  group: deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Build & Deploy
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Tear down existing stack
+        run: docker compose down
+
+      - name: Build image
+        run: docker compose build
+
+      - name: Start stack
+        run: docker compose up -d
+
+      - name: Health check
+        run: |
+          echo "Waiting for container to be ready..."
+          sleep 15
+          docker compose ps
+          STATUS=$(docker inspect --format='{{.State.Health.Status}}' mt-dashboard 2>/dev/null || echo "unknown")
+          echo "Container health: $STATUS"
+          if [ "$STATUS" = "unhealthy" ]; then
+            echo "Container is unhealthy — printing logs:"
+            docker compose logs --tail=50
+            exit 1
+          fi
