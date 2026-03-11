@@ -586,7 +586,6 @@ td.dur-cell  { color: var(--muted); font-size: 12px; white-space: nowrap; }
   line-height: 1.6;
   background: #0a0c10;
   min-height: 300px;
-  max-height: 520px;
 }
 .log-content .log-line { display: block; white-space: pre; }
 .log-content .log-line.info  { color: #c9d1d9; }
