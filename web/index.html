@@ -92,6 +92,10 @@
     </div>
 
     <!-- Detail panel (inline below table) -->
+    <div id="detail-section">
+    <div class="section-header" id="detail-section-header">
+      <h2>Run Detail</h2>
+    </div>
     <div id="detail-panel">
       <div class="detail-header">
         <h3 id="detail-run-id">–</h3>
@@ -115,6 +119,7 @@
         </div>
       </div>
     </div>
+    </div><!-- /detail-section -->
   </main>
 </div>
 
@@ -336,9 +341,9 @@ const App = (() => {
     const run = runs.find(r => r.run_id === runId);
     if (!run) return;
 
-    const panel = el('detail-panel');
-    panel.classList.add('visible');
-    panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const section = el('detail-section');
+    section.classList.add('visible');
+    section.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
     el('detail-run-id').textContent = run.run_id;
     updateDetailPanel(run);
@@ -594,7 +599,7 @@ const App = (() => {
     selectedRunId = null;
     _fpToggleState = {};
     stopLogStream();
-    el('detail-panel').classList.remove('visible');
+    el('detail-section').classList.remove('visible');
     el('detail-file-progress').innerHTML = '';
     renderRunsTable(filteredRuns);
   }

@@ -308,15 +308,15 @@ td.dur-cell  { color: var(--muted); font-size: 12px; white-space: nowrap; }
 .empty-state p { font-size: 14px; }
 
 /* ── Run detail panel ─────────────────────────────────────────── */
+#detail-section { display: none; margin-top: 16px; }
+#detail-section.visible { display: block; }
+#detail-section .section-header { margin-bottom: 10px; }
 #detail-panel {
-  display: none;
-  margin-top: 16px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   overflow: hidden;
 }
-#detail-panel.visible { display: block; }
 .detail-header {
   display: flex;
   align-items: center;
