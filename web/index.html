@@ -305,8 +305,7 @@ const App = (() => {
       const fileCountBadge = (s.status === 'running' && fp && fp.total_files > 0)
         ? `<span class="banner-file-progress">&nbsp;${fp.current_file ? fp.processed_files + 1 : fp.processed_files}/${fp.total_files}</span>`
         : '';
-      return (i > 0 ? '<span class="step-arrow">›</span>' : '') +
-        `<span class="step-pill ${s.status}">${s.name}</span>${fileCountBadge}`;
+      return `<span class="step-group">${i > 0 ? '<span class="step-arrow">›</span>' : ''}<span class="step-pill ${s.status}">${s.name}</span>${fileCountBadge}</span>`;
     }).join('');
   }
 
