@@ -350,6 +350,8 @@ td.dur-cell  { color: var(--muted); font-size: 12px; white-space: nowrap; }
 }
 @media (max-width: 800px) {
   .detail-body { grid-template-columns: 1fr; }
+  .banner-step-track { flex-wrap: wrap; }
+  .step-arrow { display: none; }
 }
 
 /* ── Detail metadata sidebar ──────────────────────────────────── */
