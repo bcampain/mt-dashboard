@@ -298,7 +298,7 @@ const App = (() => {
     el('banner-steps').innerHTML = steps.map((s, i) => {
       const fp = s.file_progress;
       const fileCountBadge = (s.status === 'running' && fp && fp.total_files > 0)
-        ? `<span class="banner-file-progress">&nbsp;${fp.processed_files}/${fp.total_files}</span>`
+        ? `<span class="banner-file-progress">&nbsp;${fp.current_file ? fp.processed_files + 1 : fp.processed_files}/${fp.total_files}</span>`
         : '';
       return (i > 0 ? '<span class="step-arrow">›</span>' : '') +
         `<span class="step-pill ${s.status}">${s.name}</span>${fileCountBadge}`;
@@ -370,14 +370,18 @@ const App = (() => {
     const hasErrors = failed > 0;
     const isDone    = stepStatus === 'complete' || stepStatus === 'failed';
 
+    // When a file is actively encoding, it counts as "in progress" (processed + 1)
+    const inProgress = !isDone && fp.current_file;
+    const displayIdx = inProgress ? processed + 1 : processed;
+
     // Label: "7 of 12 files · 58%" (running) or "12 of 12 files" (done)
     const label = isDone
       ? `${processed} of ${total} ${plural(total, 'file')} processed`
-      : `${processed} of ${total} ${plural(total, 'file')} · ${pct}%`;
+      : `${displayIdx} of ${total} ${plural(total, 'file')} · ${pct}%`;
 
     // Current file line (only while running)
-    const currentHtml = (!isDone && fp.current_file)
-      ? `<div class="file-progress-current">Encoding ${processed} of ${total}: <span>${escapeHtml(fp.current_file)}</span></div>`
+    const currentHtml = inProgress
+      ? `<div class="file-progress-current">Encoding ${displayIdx} of ${total}: <span>${escapeHtml(fp.current_file)}</span></div>`
       : '';
 
     // Per-file list (always rendered if files array is present; toggle is controlled by JS)
