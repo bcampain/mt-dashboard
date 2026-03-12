@@ -504,6 +504,11 @@ const App = (() => {
       if (list) list.scrollTop = top;
     });
 
+    // Sync stripe animation phase to wall clock so DOM re-renders don't cause a visible reset
+    _fpContainer.querySelectorAll('.file-progress-bar-fill.is-running').forEach(fill => {
+      fill.style.setProperty('--stripe-delay', `-${Date.now() % 900}ms`);
+    });
+
     el('detail-meta-content').innerHTML = `
       <div class="meta-section">
         <h4>Run Metadata</h4>

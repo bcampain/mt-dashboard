@@ -493,7 +493,8 @@ td.dur-cell  { color: var(--muted); font-size: 12px; white-space: nowrap; }
     rgba(0,0,0,0.12)   7px,
     rgba(0,0,0,0.12)  14px
   );
-  animation: stripes-slide 500ms linear infinite;
+  animation: stripes-slide 900ms linear infinite;
+  animation-delay: var(--stripe-delay, 0ms);
 }
 .file-progress-current {
   font-size: 11px;
