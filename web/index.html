@@ -372,8 +372,10 @@ const App = (() => {
     const processed = fp.processed_files || 0;
     const total     = fp.total_files;
     const failed    = fp.failed_files || 0;
+    const skipped   = fp.skipped_files || 0;
     const pct       = Math.round((processed / total) * 100);
     const hasErrors   = failed > 0;
+    const hasSkipped  = skipped > 0;
     // Run status is authoritative for the three visual states
     const isRunning   = runStatus === 'running'   && stepStatus === 'running';
     const isCancelled = runStatus === 'cancelled';
@@ -426,7 +428,7 @@ const App = (() => {
     return `<div class="file-progress-wrap">
       <div class="file-progress-header">
         <span class="file-progress-label">${stepLabel} Files</span>
-        <span class="file-progress-count">${label}${hasErrors ? ` · ${failed} failed` : ''}</span>
+        <span class="file-progress-count">${label}${hasErrors ? ` · ${failed} failed` : ''}${hasSkipped ? ` · ${skipped} skipped` : ''}</span>
       </div>
       <div class="file-progress-bar-track">
         <div class="file-progress-bar-fill${hasErrors ? ' has-failures' : ''}${isRunning ? ' is-running' : ''}${isCancelled ? ' is-cancelled' : ''}"
