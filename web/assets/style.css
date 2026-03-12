@@ -547,6 +547,7 @@ td.dur-cell  { color: var(--muted); font-size: 12px; white-space: nowrap; }
 .file-dot.running  { background: var(--running); animation: blink 1s ease-in-out infinite; }
 .file-dot.complete { background: var(--success); }
 .file-dot.failed   { background: var(--error); }
+.file-dot.cancelled { background: var(--muted); }
 .file-item.running  { color: var(--text); }
 .file-item.complete { color: var(--muted); }
 .file-item.failed   { color: var(--error); }
