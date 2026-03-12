@@ -480,7 +480,7 @@ td.dur-cell  { color: var(--muted); font-size: 12px; white-space: nowrap; }
 /* Actively running — diagonal stripe overlay scrolls right to signal live processing */
 @keyframes stripes-slide {
   from { background-position: 0 0; }
-  to   { background-position: 20px 0; }
+  to   { background-position: 17px 0; }
 }
 .file-progress-bar-fill.is-running::after {
   content: '';
