@@ -283,7 +283,7 @@ td.dur-cell  { color: var(--muted); font-size: 12px; white-space: nowrap; }
 .badge.status-running   { background: var(--running-dim);  color: var(--running);  border: 1px solid var(--running); }
 .badge.status-complete  { background: var(--success-dim);  color: var(--success);  border: 1px solid var(--success); }
 .badge.status-failed    { background: var(--error-dim);    color: var(--error);    border: 1px solid var(--error); }
-.badge.status-cancelled { background: var(--surface-2);    color: var(--muted);    border: 1px solid var(--border); }
+.badge.status-cancelled { background: var(--surface-2);    color: var(--cancelled);    border: 1px solid var(--border); }
 .badge.kind-tv      { background: #1a2a3a; color: #79b8ff; }
 .badge.kind-movies  { background: #2a1a3a; color: #c997ff; }
 .badge.kind-clips   { background: #1a3a2a; color: #7ee787; }
