@@ -347,7 +347,7 @@ td.dur-cell  { color: var(--muted); font-size: 12px; white-space: nowrap; }
 .detail-body {
   display: grid;
   grid-template-columns: 300px 1fr;
-  min-height: 360px;
+  /* height is content-driven by the meta sidebar; log column fills to match */
 }
 @media (max-width: 800px) {
   .detail-body { grid-template-columns: 1fr; }
@@ -359,8 +359,7 @@ td.dur-cell  { color: var(--muted); font-size: 12px; white-space: nowrap; }
 .detail-meta {
   border-right: 1px solid var(--border);
   padding: 16px;
-  overflow-y: auto;
-  overflow-x: hidden;
+  /* no overflow/scroll — sidebar sizes to content and drives panel height */
 }
 .meta-section { margin-bottom: 20px; }
 .meta-section h4 {
@@ -564,6 +563,7 @@ td.dur-cell  { color: var(--muted); font-size: 12px; white-space: nowrap; }
   flex-direction: column;
   min-width: 0; /* prevent grid column from overflowing its 1fr allocation */
   overflow: hidden;
+  height: 100%; /* fills the grid row height set by the sidebar, enabling flex:1 on log-content */
 }
 .log-toolbar {
   display: flex;
@@ -588,7 +588,7 @@ td.dur-cell  { color: var(--muted); font-size: 12px; white-space: nowrap; }
   font-size: 12px;
   line-height: 1.6;
   background: #0a0c10;
-  min-height: 300px;
+  /* min-height removed — parent .detail-body has fixed height; flex:1 fills it */
 }
 .log-content .log-line { display: block; white-space: pre; }
 .log-content .log-line.info  { color: #c9d1d9; }

@@ -467,11 +467,25 @@ const App = (() => {
       </div>`;
     }).join('');
 
-    // File progress widgets — rendered above the log pane for any step with file data
-    const fpHtml = steps
-      .filter(s => s.file_progress && s.file_progress.total_files > 0)
-      .map(s => renderFileProgress(s.name, s.file_progress, s.status))
-      .join('');
+    // File progress widget — display logic:
+    //   • Run is still active  → show only the currently-running step's widget
+    //   • Run is done (complete / failed / cancelled) → show all steps that have data
+    const runIsDone = run.status !== 'running';
+    let fpHtml = '';
+    if (runIsDone) {
+      // Pipeline finished — show every step that collected file progress
+      fpHtml = steps
+        .filter(s => s.file_progress && s.file_progress.total_files > 0)
+        .map(s => renderFileProgress(s.name, s.file_progress, s.status))
+        .join('');
+    } else {
+      // Pipeline active — find the step currently running and show only its widget
+      const activeStep = steps.find(s => s.status === 'running');
+      if (activeStep && activeStep.file_progress && activeStep.file_progress.total_files > 0) {
+        fpHtml = renderFileProgress(activeStep.name, activeStep.file_progress, activeStep.status);
+      }
+      // (widget stays hidden if the running step has no file progress data yet)
+    }
     el('detail-file-progress').innerHTML = fpHtml;
 
     el('detail-meta-content').innerHTML = `
