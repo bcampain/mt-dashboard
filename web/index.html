@@ -336,6 +336,7 @@ const App = (() => {
       return;
     }
     selectedRunId = runId;
+    _fpToggleState = {}; // reset file list expansion state for the new run
     renderRunsTable(filteredRuns); // highlight selected row
 
     const run = runs.find(r => r.run_id === runId);
