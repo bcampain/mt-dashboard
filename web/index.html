@@ -487,7 +487,19 @@ const App = (() => {
       }
       // (widget stays hidden if the running step has no file progress data yet)
     }
-    el('detail-file-progress').innerHTML = fpHtml;
+    // Preserve scroll positions of ALL open file lists across re-renders
+    const _fpContainer = el('detail-file-progress');
+    const _scrollMap = {};
+    _fpContainer.querySelectorAll('.file-list.visible').forEach(list => {
+      if (list.id && list.scrollTop > 0) _scrollMap[list.id] = list.scrollTop;
+    });
+
+    _fpContainer.innerHTML = fpHtml;
+
+    Object.entries(_scrollMap).forEach(([id, top]) => {
+      const list = document.getElementById(id);
+      if (list) list.scrollTop = top;
+    });
 
     el('detail-meta-content').innerHTML = `
       <div class="meta-section">
