@@ -16,6 +16,8 @@
   --warning-dim:  #3a2f10;
   --error:        #f85149;
   --error-dim:    #3a1a1a;
+  --cancelled:     #a371f7;
+  --cancelled-dim: #2d1f5e;
   --running:      #58a6ff;
   --running-dim:  #1f3a5a;
   --pending:      #8b949e;
@@ -473,9 +475,9 @@ td.dur-cell  { color: var(--muted); font-size: 12px; white-space: nowrap; }
 .file-progress-bar-fill.is-running.has-failures {
   background: linear-gradient(90deg, var(--accent) 0%, var(--warning) 100%);
 }
-/* Cancelled / interrupted run — muted to signal "stopped, not done" */
+/* Cancelled / interrupted run — purple signals deliberate stop, not error */
 .file-progress-bar-fill.is-cancelled {
-  background: linear-gradient(90deg, #3a4451 0%, var(--muted) 100%);
+  background: linear-gradient(90deg, #3a4451 0%, var(--cancelled) 100%);
 }
 /* Actively running — diagonal stripe overlay scrolls right to signal live processing */
 @keyframes stripes-slide {
@@ -547,7 +549,7 @@ td.dur-cell  { color: var(--muted); font-size: 12px; white-space: nowrap; }
 .file-dot.running  { background: var(--running); animation: blink 1s ease-in-out infinite; }
 .file-dot.complete { background: var(--success); }
 .file-dot.failed   { background: var(--error); }
-.file-dot.cancelled { background: var(--muted); }
+.file-dot.cancelled { background: var(--cancelled); }
 .file-item.running  { color: var(--text); }
 .file-item.complete { color: var(--muted); }
 .file-item.failed   { color: var(--error); }
