@@ -685,8 +685,21 @@ const App = (() => {
 
   document.addEventListener('DOMContentLoaded', init);
 
+  function pauseRefresh() {
+    clearInterval(runsInterval);
+    clearInterval(statsInterval);
+    runsInterval = statsInterval = null;
+    console.info('[mt-dashboard] auto-refresh paused');
+  }
+  function resumeRefresh() {
+    if (!runsInterval)  runsInterval  = setInterval(fetchRuns,  5000);
+    if (!statsInterval) statsInterval = setInterval(fetchStats, 15000);
+    console.info('[mt-dashboard] auto-refresh resumed');
+  }
+
   return { refresh, selectRun, selectActiveRun, closeDetail,
-           applyFilter, toggleAutoScroll, refreshLog, toggleFileList };
+           applyFilter, toggleAutoScroll, refreshLog, toggleFileList,
+           pauseRefresh, resumeRefresh };
 })();
 </script>
 </body>
