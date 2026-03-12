@@ -347,7 +347,6 @@ td.dur-cell  { color: var(--muted); font-size: 12px; white-space: nowrap; }
 .detail-body {
   display: grid;
   grid-template-columns: 300px 1fr;
-  /* height is content-driven by the meta sidebar; log column fills to match */
 }
 @media (max-width: 800px) {
   .detail-body { grid-template-columns: 1fr; }
@@ -359,7 +358,6 @@ td.dur-cell  { color: var(--muted); font-size: 12px; white-space: nowrap; }
 .detail-meta {
   border-right: 1px solid var(--border);
   padding: 16px;
-  /* no overflow/scroll — sidebar sizes to content and drives panel height */
 }
 .meta-section { margin-bottom: 20px; }
 .meta-section h4 {
@@ -451,7 +449,6 @@ td.dur-cell  { color: var(--muted); font-size: 12px; white-space: nowrap; }
   color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
-/* Progress bar track */
 .file-progress-bar-track {
   height: 8px;
   background: var(--border);
@@ -459,7 +456,6 @@ td.dur-cell  { color: var(--muted); font-size: 12px; white-space: nowrap; }
   overflow: hidden;
   margin-bottom: 6px;
 }
-/* Progress bar fill — width set inline via JS */
 .file-progress-bar-fill {
   height: 100%;
   border-radius: 4px;
@@ -469,7 +465,6 @@ td.dur-cell  { color: var(--muted); font-size: 12px; white-space: nowrap; }
 .file-progress-bar-fill.has-failures {
   background: linear-gradient(90deg, var(--accent) 0%, var(--warning) 100%);
 }
-/* Current file being encoded */
 .file-progress-current {
   font-size: 11px;
   color: var(--muted);
@@ -483,7 +478,6 @@ td.dur-cell  { color: var(--muted); font-size: 12px; white-space: nowrap; }
   font-family: var(--font-mono);
   font-size: 10px;
 }
-/* Collapsible per-file list */
 .file-list-toggle {
   display: flex;
   align-items: center;
@@ -497,7 +491,6 @@ td.dur-cell  { color: var(--muted); font-size: 12px; white-space: nowrap; }
 .file-list-toggle:hover { color: var(--text); }
 .file-list-toggle .toggle-arrow { font-size: 9px; transition: transform 0.2s; }
 .file-list-toggle.open .toggle-arrow { transform: rotate(90deg); }
-/* Per-file status grid */
 .file-list {
   display: none;
   flex-direction: column;
@@ -527,7 +520,6 @@ td.dur-cell  { color: var(--muted); font-size: 12px; white-space: nowrap; }
 .file-item.running  { color: var(--text); }
 .file-item.complete { color: var(--muted); }
 .file-item.failed   { color: var(--error); }
-/* Also show progress in the active banner */
 .banner-file-progress {
   font-size: 11px;
   color: var(--accent);
@@ -561,9 +553,9 @@ td.dur-cell  { color: var(--muted); font-size: 12px; white-space: nowrap; }
 .detail-log {
   display: flex;
   flex-direction: column;
-  min-width: 0; /* prevent grid column from overflowing its 1fr allocation */
+  min-width: 0;  /* prevent 1fr column overflow */
+  min-height: 0; /* exclude from grid row height; sidebar drives it */
   overflow: hidden;
-  height: 100%; /* fills the grid row height set by the sidebar, enabling flex:1 on log-content */
 }
 .log-toolbar {
   display: flex;
@@ -588,7 +580,6 @@ td.dur-cell  { color: var(--muted); font-size: 12px; white-space: nowrap; }
   font-size: 12px;
   line-height: 1.6;
   background: #0a0c10;
-  /* min-height removed — parent .detail-body has fixed height; flex:1 fills it */
 }
 .log-content .log-line { display: block; white-space: pre; }
 .log-content .log-line.info  { color: #c9d1d9; }
