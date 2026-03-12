@@ -139,6 +139,7 @@ const App = (() => {
   let globalEventSource = null;
   let statsInterval = null;
   let runsInterval = null;
+  let detailMetaResizeObserver = null;
 
   // ── Utilities ────────────────────────────────────────────────────────────
 
@@ -511,6 +512,34 @@ const App = (() => {
         <div class="step-timeline">${timelineHtml || '<div style="color:var(--muted);font-size:12px;">No steps</div>'}</div>
       </div>
     `;
+
+    syncDetailLogHeight();
+  }
+
+  function syncDetailLogHeight() {
+    const meta = el('detail-meta-content');
+    const log  = document.querySelector('.detail-log');
+    if (!meta || !log) return;
+    if (window.matchMedia('(max-width: 800px)').matches) {
+      log.style.height = '';
+      return;
+    }
+    // offsetHeight forces a layout reflow, giving us the sidebar's true rendered height
+    log.style.height = meta.offsetHeight + 'px';
+  }
+
+  function setupDetailLogHeightSync() {
+    const meta = el('detail-meta-content');
+    if (!meta) return;
+
+    if ('ResizeObserver' in window) {
+      detailMetaResizeObserver = new ResizeObserver(() => {
+        syncDetailLogHeight();
+      });
+      detailMetaResizeObserver.observe(meta);
+    }
+
+    window.addEventListener('resize', syncDetailLogHeight);
   }
 
   async function loadLog(run) {
@@ -627,6 +656,7 @@ const App = (() => {
   // ── Init ──────────────────────────────────────────────────────────────────
 
   function init() {
+    setupDetailLogHeightSync();
     fetchStats();
     fetchRuns();
     startGlobalEvents();

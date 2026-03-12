@@ -347,6 +347,7 @@ td.dur-cell  { color: var(--muted); font-size: 12px; white-space: nowrap; }
 .detail-body {
   display: grid;
   grid-template-columns: 300px 1fr;
+  align-items: start;
 }
 @media (max-width: 800px) {
   .detail-body { grid-template-columns: 1fr; }
@@ -553,8 +554,8 @@ td.dur-cell  { color: var(--muted); font-size: 12px; white-space: nowrap; }
 .detail-log {
   display: flex;
   flex-direction: column;
-  min-width: 0;  /* prevent 1fr column overflow */
-  min-height: 0; /* exclude from grid row height; sidebar drives it */
+  min-width: 0; /* prevent 1fr column overflow */
+  min-height: 0; /* allow log-content to scroll instead of forcing parent growth */
   overflow: hidden;
 }
 .log-toolbar {
