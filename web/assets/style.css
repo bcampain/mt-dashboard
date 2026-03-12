@@ -462,36 +462,38 @@ td.dur-cell  { color: var(--muted); font-size: 12px; white-space: nowrap; }
   border-radius: 4px;
   transition: width 0.4s ease;
   background: linear-gradient(90deg, var(--accent) 0%, var(--success) 100%);
+  position: relative;
+  overflow: hidden;
 }
+/* Failed/done with errors — charcoal/red, clearly stopped and broken */
 .file-progress-bar-fill.has-failures {
+  background: linear-gradient(90deg, #3a2020 0%, var(--error) 100%);
+}
+/* Running with errors — blue/amber base (stripes applied via ::after) */
+.file-progress-bar-fill.is-running.has-failures {
   background: linear-gradient(90deg, var(--accent) 0%, var(--warning) 100%);
 }
 /* Cancelled / interrupted run — muted to signal "stopped, not done" */
 .file-progress-bar-fill.is-cancelled {
   background: linear-gradient(90deg, #3a4451 0%, var(--muted) 100%);
 }
-/* Actively running — slow flowing gradient to signal live processing */
-@keyframes bar-flow {
-  0%   { background-position: 100% 0; }
-  100% { background-position:   0% 0; }
+/* Actively running — diagonal stripe overlay scrolls right to signal live processing */
+@keyframes stripes-slide {
+  from { background-position: 0 0; }
+  to   { background-position: 20px 0; }
 }
-.file-progress-bar-fill.is-running {
-  background: linear-gradient(90deg,
-    var(--success) 0%, var(--accent) 25%,
-    var(--success) 50%, var(--accent) 75%,
-    var(--success) 100%
+.file-progress-bar-fill.is-running::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    -55deg,
+    transparent        0px,
+    transparent        7px,
+    rgba(0,0,0,0.12)   7px,
+    rgba(0,0,0,0.12)  14px
   );
-  background-size: 250% 100%;
-  animation: bar-flow 3s linear infinite;
-}
-.file-progress-bar-fill.is-running.has-failures {
-  background: linear-gradient(90deg,
-    var(--warning) 0%, var(--accent) 25%,
-    var(--warning) 50%, var(--accent) 75%,
-    var(--warning) 100%
-  );
-  background-size: 250% 100%;
-  animation: bar-flow 3s linear infinite;
+  animation: stripes-slide 500ms linear infinite;
 }
 .file-progress-current {
   font-size: 11px;

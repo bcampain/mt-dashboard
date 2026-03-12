@@ -373,9 +373,10 @@ const App = (() => {
     const failed    = fp.failed_files || 0;
     const pct       = Math.round((processed / total) * 100);
     const hasErrors   = failed > 0;
-    const isDone      = stepStatus === 'complete' || stepStatus === 'failed';
-    const isRunning   = stepStatus === 'running'  && runStatus  === 'running';
-    const isCancelled = !isDone && !isRunning;
+    // Run status is authoritative for the three visual states
+    const isRunning   = runStatus === 'running'   && stepStatus === 'running';
+    const isCancelled = runStatus === 'cancelled';
+    const isDone      = !isRunning && !isCancelled;
 
     // When a file is actively encoding, it counts as "in progress" (processed + 1)
     const inProgress = !isDone && fp.current_file;
