@@ -466,6 +466,33 @@ td.dur-cell  { color: var(--muted); font-size: 12px; white-space: nowrap; }
 .file-progress-bar-fill.has-failures {
   background: linear-gradient(90deg, var(--accent) 0%, var(--warning) 100%);
 }
+/* Cancelled / interrupted run — muted to signal "stopped, not done" */
+.file-progress-bar-fill.is-cancelled {
+  background: linear-gradient(90deg, #3a4451 0%, var(--muted) 100%);
+}
+/* Actively running — slow flowing gradient to signal live processing */
+@keyframes bar-flow {
+  0%   { background-position: 100% 0; }
+  100% { background-position:   0% 0; }
+}
+.file-progress-bar-fill.is-running {
+  background: linear-gradient(90deg,
+    var(--success) 0%, var(--accent) 25%,
+    var(--success) 50%, var(--accent) 75%,
+    var(--success) 100%
+  );
+  background-size: 250% 100%;
+  animation: bar-flow 3s linear infinite;
+}
+.file-progress-bar-fill.is-running.has-failures {
+  background: linear-gradient(90deg,
+    var(--warning) 0%, var(--accent) 25%,
+    var(--warning) 50%, var(--accent) 75%,
+    var(--warning) 100%
+  );
+  background-size: 250% 100%;
+  animation: bar-flow 3s linear infinite;
+}
 .file-progress-current {
   font-size: 11px;
   color: var(--muted);
