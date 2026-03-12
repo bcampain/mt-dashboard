@@ -365,7 +365,7 @@ const App = (() => {
   // Unique ID counter for per-step file list toggle state
   let _fpToggleState = {};
 
-  function renderFileProgress(stepName, fp, stepStatus) {
+  function renderFileProgress(stepName, fp, stepStatus, runStatus) {
     if (!fp || fp.total_files === 0) return '';
 
     const processed = fp.processed_files || 0;
@@ -374,7 +374,7 @@ const App = (() => {
     const pct       = Math.round((processed / total) * 100);
     const hasErrors   = failed > 0;
     const isDone      = stepStatus === 'complete' || stepStatus === 'failed';
-    const isRunning   = stepStatus === 'running';
+    const isRunning   = stepStatus === 'running'  && runStatus  === 'running';
     const isCancelled = !isDone && !isRunning;
 
     // When a file is actively encoding, it counts as "in progress" (processed + 1)
@@ -479,13 +479,13 @@ const App = (() => {
       // Pipeline finished — show every step that collected file progress
       fpHtml = steps
         .filter(s => s.file_progress && s.file_progress.total_files > 0)
-        .map(s => renderFileProgress(s.name, s.file_progress, s.status))
+        .map(s => renderFileProgress(s.name, s.file_progress, s.status, run.status))
         .join('');
     } else {
       // Pipeline active — find the step currently running and show only its widget
       const activeStep = steps.find(s => s.status === 'running');
       if (activeStep && activeStep.file_progress && activeStep.file_progress.total_files > 0) {
-        fpHtml = renderFileProgress(activeStep.name, activeStep.file_progress, activeStep.status);
+        fpHtml = renderFileProgress(activeStep.name, activeStep.file_progress, activeStep.status, run.status);
       }
       // (widget stays hidden if the running step has no file progress data yet)
     }
