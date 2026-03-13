@@ -11,7 +11,7 @@
 <body>
 <div id="app">
   <header>
-    <div class="logo">mt<span>-dashboard</span></div>
+    <div class="logo">media-tools<span> dashboard</span></div>
     <div class="spacer"></div>
     <div id="live-dot" title="Live updates"></div>
     <div id="last-updated">–</div>
@@ -92,6 +92,10 @@
     </div>
 
     <!-- Detail panel (inline below table) -->
+    <div id="detail-section">
+    <div class="section-header" id="detail-section-header">
+      <h2>Run Detail</h2>
+    </div>
     <div id="detail-panel">
       <div class="detail-header">
         <h3 id="detail-run-id">–</h3>
@@ -105,6 +109,7 @@
         </div>
         <div class="detail-log">
           <div id="detail-file-progress"></div>
+          <div id="log-tabs"></div>
           <div class="log-toolbar">
             <span id="log-info">Log</span>
             <div class="spacer"></div>
@@ -115,6 +120,7 @@
         </div>
       </div>
     </div>
+    </div><!-- /detail-section -->
   </main>
 </div>
 
@@ -129,11 +135,13 @@ const App = (() => {
   let runs = [];
   let filteredRuns = [];
   let selectedRunId = null;
+  let activeLogStep = null;  // null = pipeline log, string = step name
   let autoScroll = true;
   let logEventSource = null;
   let globalEventSource = null;
   let statsInterval = null;
   let runsInterval = null;
+  let detailMetaResizeObserver = null;
 
   // ── Utilities ────────────────────────────────────────────────────────────
 
@@ -300,8 +308,7 @@ const App = (() => {
       const fileCountBadge = (s.status === 'running' && fp && fp.total_files > 0)
         ? `<span class="banner-file-progress">&nbsp;${fp.current_file ? fp.processed_files + 1 : fp.processed_files}/${fp.total_files}</span>`
         : '';
-      return (i > 0 ? '<span class="step-arrow">›</span>' : '') +
-        `<span class="step-pill ${s.status}">${s.name}</span>${fileCountBadge}`;
+      return `<span class="step-group">${i > 0 ? '<span class="step-arrow">›</span>' : ''}<span class="step-pill ${s.status}">${s.name}</span>${fileCountBadge}</span>`;
     }).join('');
   }
 
@@ -331,14 +338,28 @@ const App = (() => {
       return;
     }
     selectedRunId = runId;
+    _fpToggleState = {}; // reset file list expansion state for the new run
+
+    // Auto-select log tab: prefer the currently-running step, else the first planned step.
+    // Fall back to the pipeline log for old runs that pre-date step_log_files.
+    const run = runs.find(r => r.run_id === runId);
+    if (run) {
+      const stepNames = Object.keys(run.step_log_files || {});
+      if (stepNames.length > 0) {
+        const runningStep = (run.steps || []).find(s => s.status === 'running');
+        activeLogStep = runningStep ? runningStep.name : stepNames[0];
+      } else {
+        activeLogStep = null;
+      }
+    }
+
     renderRunsTable(filteredRuns); // highlight selected row
 
-    const run = runs.find(r => r.run_id === runId);
     if (!run) return;
 
-    const panel = el('detail-panel');
-    panel.classList.add('visible');
-    panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const section = el('detail-section');
+    section.classList.add('visible');
+    section.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
     el('detail-run-id').textContent = run.run_id;
     updateDetailPanel(run);
@@ -360,15 +381,20 @@ const App = (() => {
   // Unique ID counter for per-step file list toggle state
   let _fpToggleState = {};
 
-  function renderFileProgress(stepName, fp, stepStatus) {
+  function renderFileProgress(stepName, fp, stepStatus, runStatus) {
     if (!fp || fp.total_files === 0) return '';
 
     const processed = fp.processed_files || 0;
     const total     = fp.total_files;
     const failed    = fp.failed_files || 0;
+    const skipped   = fp.skipped_files || 0;
     const pct       = Math.round((processed / total) * 100);
-    const hasErrors = failed > 0;
-    const isDone    = stepStatus === 'complete' || stepStatus === 'failed';
+    const hasErrors   = failed > 0;
+    const hasSkipped  = skipped > 0;
+    // Run status is authoritative for the three visual states
+    const isRunning   = runStatus === 'running'   && stepStatus === 'running';
+    const isCancelled = runStatus === 'cancelled';
+    const isDone      = !isRunning && !isCancelled;
 
     // When a file is actively encoding, it counts as "in progress" (processed + 1)
     const inProgress = !isDone && fp.current_file;
@@ -417,10 +443,10 @@ const App = (() => {
     return `<div class="file-progress-wrap">
       <div class="file-progress-header">
         <span class="file-progress-label">${stepLabel} Files</span>
-        <span class="file-progress-count">${label}${hasErrors ? ` · ${failed} failed` : ''}</span>
+        <span class="file-progress-count">${label}${hasErrors ? ` · ${failed} failed` : ''}${hasSkipped ? ` · ${skipped} skipped` : ''}</span>
       </div>
       <div class="file-progress-bar-track">
-        <div class="file-progress-bar-fill ${hasErrors ? 'has-failures' : ''}"
+        <div class="file-progress-bar-fill${hasErrors ? ' has-failures' : ''}${isRunning ? ' is-running' : ''}${isCancelled ? ' is-cancelled' : ''}"
              style="width:${pct}%"></div>
       </div>
       ${currentHtml}
@@ -434,6 +460,34 @@ const App = (() => {
     const list    = document.getElementById(`fll-${stepName}`);
     if (toggle) toggle.classList.toggle('open', _fpToggleState[stepName]);
     if (list)   list.classList.toggle('visible', _fpToggleState[stepName]);
+  }
+
+  // ── Log step tabs ─────────────────────────────────────────────────────────
+
+  function renderLogTabs(run) {
+    const tabsEl = el('log-tabs');
+    const stepNames = Object.keys(run.step_log_files || {});
+    if (!stepNames.length) { tabsEl.innerHTML = ''; return; }
+
+    tabsEl.innerHTML = [
+      ...stepNames.map(name =>
+        `<button class="log-tab${activeLogStep === name ? ' active' : ''}"
+                 onclick="App.selectLogStep('${name}')">${name}</button>`
+      ),
+      `<button class="log-tab pipeline${activeLogStep === null ? ' active' : ''}"
+               onclick="App.selectLogStep(null)">pipeline</button>`
+    ].join('');
+  }
+
+  function selectLogStep(step) {
+    activeLogStep = step;
+    const run = runs.find(r => r.run_id === selectedRunId);
+    if (!run) return;
+    renderLogTabs(run);
+    stopLogStream();
+    loadLog(run).then(() => {
+      if (run.status === 'running') startLogStream(selectedRunId);
+    });
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -463,12 +517,39 @@ const App = (() => {
       </div>`;
     }).join('');
 
-    // File progress widgets — rendered above the log pane for any step with file data
-    const fpHtml = steps
-      .filter(s => s.file_progress && s.file_progress.total_files > 0)
-      .map(s => renderFileProgress(s.name, s.file_progress, s.status))
-      .join('');
-    el('detail-file-progress').innerHTML = fpHtml;
+    // File progress widget — display logic:
+    //   • Run is still active  → show only the currently-running step's widget
+    //   • Run is done (complete / failed / cancelled) → show all steps that have data
+    const runIsDone = run.status !== 'running';
+    let fpHtml = '';
+    if (runIsDone) {
+      // Pipeline finished — show every step that collected file progress
+      fpHtml = steps
+        .filter(s => s.file_progress && s.file_progress.total_files > 0)
+        .map(s => renderFileProgress(s.name, s.file_progress, s.status, run.status))
+        .join('');
+    } else {
+      // Pipeline active — find the step currently running and show only its widget
+      const activeStep = steps.find(s => s.status === 'running');
+      if (activeStep && activeStep.file_progress && activeStep.file_progress.total_files > 0) {
+        fpHtml = renderFileProgress(activeStep.name, activeStep.file_progress, activeStep.status, run.status);
+      }
+      // (widget stays hidden if the running step has no file progress data yet)
+    }
+    // Preserve scroll positions of ALL open file lists across re-renders
+    const _fpContainer = el('detail-file-progress');
+    const _scrollMap = {};
+    _fpContainer.querySelectorAll('.file-list.visible').forEach(list => {
+      if (list.id && list.scrollTop > 0) _scrollMap[list.id] = list.scrollTop;
+    });
+
+    _fpContainer.innerHTML = fpHtml;
+
+    Object.entries(_scrollMap).forEach(([id, top]) => {
+      const list = document.getElementById(id);
+      if (list) list.scrollTop = top;
+    });
+
 
     el('detail-meta-content').innerHTML = `
       <div class="meta-section">
@@ -493,6 +574,34 @@ const App = (() => {
         <div class="step-timeline">${timelineHtml || '<div style="color:var(--muted);font-size:12px;">No steps</div>'}</div>
       </div>
     `;
+
+    syncDetailLogHeight();
+  }
+
+  function syncDetailLogHeight() {
+    const meta = el('detail-meta-content');
+    const log  = document.querySelector('.detail-log');
+    if (!meta || !log) return;
+    if (window.matchMedia('(max-width: 800px)').matches) {
+      log.style.height = '';
+      return;
+    }
+    // offsetHeight forces a layout reflow, giving us the sidebar's true rendered height
+    log.style.height = meta.offsetHeight + 'px';
+  }
+
+  function setupDetailLogHeightSync() {
+    const meta = el('detail-meta-content');
+    if (!meta) return;
+
+    if ('ResizeObserver' in window) {
+      detailMetaResizeObserver = new ResizeObserver(() => {
+        syncDetailLogHeight();
+      });
+      detailMetaResizeObserver.observe(meta);
+    }
+
+    window.addEventListener('resize', syncDetailLogHeight);
   }
 
   async function loadLog(run) {
@@ -500,9 +609,15 @@ const App = (() => {
     logEl.innerHTML = '<span style="color:var(--muted)">Loading log…</span>';
 
     stopLogStream();
+    renderLogTabs(run);
+
+    const url = activeLogStep
+      ? `/api/runs/${run.run_id}/log/${activeLogStep}?lines=600`
+      : `/api/runs/${run.run_id}/log?lines=600`;
+    const stepLabel = activeLogStep ?? 'pipeline';
 
     try {
-      const r = await fetch(`/api/runs/${run.run_id}/log?lines=600`);
+      const r = await fetch(url);
       if (!r.ok) { logEl.innerHTML = '<span style="color:var(--error)">Could not load log.</span>'; return; }
       const data = await r.json();
       if (!data.lines.length && !data.log_file) {
@@ -511,11 +626,11 @@ const App = (() => {
       }
       if (!data.lines.length) {
         logEl.innerHTML = '<span style="color:var(--muted)">Log file is empty or not yet created.</span>';
-        el('log-info').textContent = `Log · 0 lines`;
+        el('log-info').textContent = `${stepLabel} · 0 lines`;
         return;
       }
       logEl.innerHTML = data.lines.map(colorizeLogLine).join('\n');
-      el('log-info').textContent = `Log · ${data.total_lines} lines`;
+      el('log-info').textContent = `${stepLabel} · ${data.total_lines} lines`;
       if (autoScroll) logEl.scrollTop = logEl.scrollHeight;
     } catch (e) {
       logEl.innerHTML = '<span style="color:var(--error)">Error fetching log.</span>';
@@ -527,7 +642,11 @@ const App = (() => {
   function startLogStream(runId) {
     stopLogStream();
     const logEl = el('log-content');
-    logEventSource = new EventSource(`/api/runs/${runId}/log/stream`);
+    const url = activeLogStep
+      ? `/api/runs/${runId}/log/${activeLogStep}/stream`
+      : `/api/runs/${runId}/log/stream`;
+    const stepLabel = activeLogStep ?? 'pipeline';
+    logEventSource = new EventSource(url);
 
     logEventSource.addEventListener('log_line', e => {
       try {
@@ -536,7 +655,7 @@ const App = (() => {
         span.innerHTML = colorizeLogLine(line) + '\n';
         logEl.appendChild(span);
         const totalLines = logEl.querySelectorAll('.log-line').length;
-        el('log-info').textContent = `Log · ${totalLines} lines (live)`;
+        el('log-info').textContent = `${stepLabel} · ${totalLines} lines (live)`;
         if (autoScroll) logEl.scrollTop = logEl.scrollHeight;
       } catch (err) { /* skip */ }
     });
@@ -592,10 +711,12 @@ const App = (() => {
 
   function closeDetail() {
     selectedRunId = null;
+    activeLogStep = null;
     _fpToggleState = {};
     stopLogStream();
-    el('detail-panel').classList.remove('visible');
+    el('detail-section').classList.remove('visible');
     el('detail-file-progress').innerHTML = '';
+    el('log-tabs').innerHTML = '';
     renderRunsTable(filteredRuns);
   }
 
@@ -609,6 +730,7 @@ const App = (() => {
   // ── Init ──────────────────────────────────────────────────────────────────
 
   function init() {
+    setupDetailLogHeightSync();
     fetchStats();
     fetchRuns();
     startGlobalEvents();
@@ -620,8 +742,21 @@ const App = (() => {
 
   document.addEventListener('DOMContentLoaded', init);
 
+  function pauseRefresh() {
+    clearInterval(runsInterval);
+    clearInterval(statsInterval);
+    runsInterval = statsInterval = null;
+    console.info('[mt-dashboard] auto-refresh paused');
+  }
+  function resumeRefresh() {
+    if (!runsInterval)  runsInterval  = setInterval(fetchRuns,  5000);
+    if (!statsInterval) statsInterval = setInterval(fetchStats, 15000);
+    console.info('[mt-dashboard] auto-refresh resumed');
+  }
+
   return { refresh, selectRun, selectActiveRun, closeDetail,
-           applyFilter, toggleAutoScroll, refreshLog, toggleFileList };
+           applyFilter, toggleAutoScroll, refreshLog, toggleFileList,
+           selectLogStep, pauseRefresh, resumeRefresh };
 })();
 </script>
 </body>

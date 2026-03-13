@@ -16,6 +16,10 @@
   --warning-dim:  #3a2f10;
   --error:        #f85149;
   --error-dim:    #3a1a1a;
+  --cancelled:     #a371f7;
+  --cancelled-dim: #2d1f5e;
+  --skipped:       #4ec9c9;
+  --skipped-dim:   #1a3535;
   --running:      #58a6ff;
   --running-dim:  #1f3a5a;
   --pending:      #8b949e;
@@ -190,7 +194,8 @@ main {
 .step-pill.running  { background: var(--running-dim); color: var(--running); border: 1px solid var(--running); }
 .step-pill.complete { background: var(--success-dim); color: var(--success); border: 1px solid var(--success); }
 .step-pill.failed   { background: var(--error-dim);   color: var(--error);   border: 1px solid var(--error); }
-.step-arrow { color: var(--border); font-size: 10px; }
+.step-group { display: flex; align-items: center; gap: 4px; }
+.step-arrow { color: var(--muted); font-size: 14px; }
 
 /* ── Section headings ─────────────────────────────────────────── */
 .section-header {
@@ -280,7 +285,7 @@ td.dur-cell  { color: var(--muted); font-size: 12px; white-space: nowrap; }
 .badge.status-running   { background: var(--running-dim);  color: var(--running);  border: 1px solid var(--running); }
 .badge.status-complete  { background: var(--success-dim);  color: var(--success);  border: 1px solid var(--success); }
 .badge.status-failed    { background: var(--error-dim);    color: var(--error);    border: 1px solid var(--error); }
-.badge.status-cancelled { background: var(--surface-2);    color: var(--muted);    border: 1px solid var(--border); }
+.badge.status-cancelled { background: var(--surface-2);    color: var(--cancelled);    border: 1px solid var(--cancelled); }
 .badge.kind-tv      { background: #1a2a3a; color: #79b8ff; }
 .badge.kind-movies  { background: #2a1a3a; color: #c997ff; }
 .badge.kind-clips   { background: #1a3a2a; color: #7ee787; }
@@ -308,15 +313,15 @@ td.dur-cell  { color: var(--muted); font-size: 12px; white-space: nowrap; }
 .empty-state p { font-size: 14px; }
 
 /* ── Run detail panel ─────────────────────────────────────────── */
+#detail-section { display: none; margin-top: 16px; }
+#detail-section.visible { display: block; }
+#detail-section .section-header { margin-bottom: 10px; }
 #detail-panel {
-  display: none;
-  margin-top: 16px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   overflow: hidden;
 }
-#detail-panel.visible { display: block; }
 .detail-header {
   display: flex;
   align-items: center;
@@ -346,18 +351,18 @@ td.dur-cell  { color: var(--muted); font-size: 12px; white-space: nowrap; }
 .detail-body {
   display: grid;
   grid-template-columns: 300px 1fr;
-  min-height: 360px;
+  align-items: start;
 }
 @media (max-width: 800px) {
   .detail-body { grid-template-columns: 1fr; }
+  .banner-step-track { flex-direction: column; align-items: flex-start; }
+  .step-arrow { display: none; }
 }
 
 /* ── Detail metadata sidebar ──────────────────────────────────── */
 .detail-meta {
   border-right: 1px solid var(--border);
   padding: 16px;
-  overflow-y: auto;
-  overflow-x: hidden;
 }
 .meta-section { margin-bottom: 20px; }
 .meta-section h4 {
@@ -449,25 +454,51 @@ td.dur-cell  { color: var(--muted); font-size: 12px; white-space: nowrap; }
   color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
-/* Progress bar track */
 .file-progress-bar-track {
-  height: 6px;
-  background: var(--surface);
-  border-radius: 3px;
+  height: 8px;
+  background: var(--border);
+  border-radius: 4px;
   overflow: hidden;
   margin-bottom: 6px;
 }
-/* Progress bar fill — width set inline via JS */
 .file-progress-bar-fill {
   height: 100%;
-  border-radius: 3px;
+  border-radius: 4px;
   transition: width 0.4s ease;
   background: linear-gradient(90deg, var(--accent) 0%, var(--success) 100%);
+  position: relative;
+  overflow: hidden;
 }
+/* Failed/done with errors — charcoal/red, clearly stopped and broken */
 .file-progress-bar-fill.has-failures {
+  background: linear-gradient(90deg, #3a2020 0%, var(--error) 100%);
+}
+/* Running with errors — blue/amber base (stripes applied via ::after) */
+.file-progress-bar-fill.is-running.has-failures {
   background: linear-gradient(90deg, var(--accent) 0%, var(--warning) 100%);
 }
-/* Current file being encoded */
+/* Cancelled / interrupted run — purple signals deliberate stop, not error */
+.file-progress-bar-fill.is-cancelled {
+  background: linear-gradient(90deg, #3a4451 0%, var(--cancelled) 100%);
+}
+/* Actively running — diagonal stripe overlay scrolls right to signal live processing */
+@keyframes stripes-slide {
+  from { background-position: 0 0; }
+  to   { background-position: 17px 0; }
+}
+.file-progress-bar-fill.is-running::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    -55deg,
+    transparent        0px,
+    transparent        7px,
+    rgba(0,0,0,0.12)   7px,
+    rgba(0,0,0,0.12)  14px
+  );
+  animation: stripes-slide 900ms linear infinite;
+}
 .file-progress-current {
   font-size: 11px;
   color: var(--muted);
@@ -481,7 +512,6 @@ td.dur-cell  { color: var(--muted); font-size: 12px; white-space: nowrap; }
   font-family: var(--font-mono);
   font-size: 10px;
 }
-/* Collapsible per-file list */
 .file-list-toggle {
   display: flex;
   align-items: center;
@@ -495,7 +525,6 @@ td.dur-cell  { color: var(--muted); font-size: 12px; white-space: nowrap; }
 .file-list-toggle:hover { color: var(--text); }
 .file-list-toggle .toggle-arrow { font-size: 9px; transition: transform 0.2s; }
 .file-list-toggle.open .toggle-arrow { transform: rotate(90deg); }
-/* Per-file status grid */
 .file-list {
   display: none;
   flex-direction: column;
@@ -518,14 +547,16 @@ td.dur-cell  { color: var(--muted); font-size: 12px; white-space: nowrap; }
   border-radius: 50%;
   flex-shrink: 0;
 }
-.file-dot.pending  { background: var(--border); }
-.file-dot.running  { background: var(--running); animation: blink 1s ease-in-out infinite; }
-.file-dot.complete { background: var(--success); }
-.file-dot.failed   { background: var(--error); }
+.file-dot.pending   { background: var(--border); }
+.file-dot.running   { background: var(--running); animation: blink 1s ease-in-out infinite; }
+.file-dot.complete  { background: var(--success); }
+.file-dot.failed    { background: var(--error); }
+.file-dot.cancelled { background: var(--cancelled); }
+.file-dot.skipped   { background: var(--skipped); }
 .file-item.running  { color: var(--text); }
 .file-item.complete { color: var(--muted); }
 .file-item.failed   { color: var(--error); }
-/* Also show progress in the active banner */
+.file-item.skipped  { color: var(--skipped); }
 .banner-file-progress {
   font-size: 11px;
   color: var(--accent);
@@ -555,11 +586,37 @@ td.dur-cell  { color: var(--muted); font-size: 12px; white-space: nowrap; }
 }
 #detail-file-progress .file-progress-current span { font-size: 12px; }
 
+/* ── Log step tabs ────────────────────────────────────────────── */
+#log-tabs:empty { display: none; }
+#log-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+  flex-wrap: wrap;
+}
+.log-tab {
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 10px;
+  text-transform: capitalize;
+  letter-spacing: 0.3px;
+}
+.log-tab:hover { background: var(--border); border-color: var(--border); color: var(--text); }
+.log-tab.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+.log-tab.pipeline.active { background: var(--surface); border-color: var(--border); color: var(--text); }
+
 /* ── Log pane ─────────────────────────────────────────────────── */
 .detail-log {
   display: flex;
   flex-direction: column;
-  min-width: 0; /* prevent grid column from overflowing its 1fr allocation */
+  min-width: 0; /* prevent 1fr column overflow */
+  min-height: 0; /* allow log-content to scroll instead of forcing parent growth */
   overflow: hidden;
 }
 .log-toolbar {
@@ -585,7 +642,6 @@ td.dur-cell  { color: var(--muted); font-size: 12px; white-space: nowrap; }
   font-size: 12px;
   line-height: 1.6;
   background: #0a0c10;
-  min-height: 300px;
 }
 .log-content .log-line { display: block; white-space: pre; }
 .log-content .log-line.info  { color: #c9d1d9; }
