@@ -17,9 +17,11 @@ GET  /api/health                    — Liveness probe
 GET  /api/stats                     — Item counts per media folder
 GET  /api/runs                      — All run manifests, newest first
 GET  /api/runs/{run_id}             — Single run manifest
-GET  /api/runs/{run_id}/log         — Log file tail (query: lines=N)
-GET  /api/runs/{run_id}/log/stream  — SSE stream of live log lines
-GET  /api/events                    — SSE broadcast when any manifest changes
+GET  /api/runs/{run_id}/log              — Pipeline log file tail (query: lines=N)
+GET  /api/runs/{run_id}/log/stream       — SSE stream of live pipeline log lines
+GET  /api/runs/{run_id}/log/{step}       — Step log file tail (query: lines=N)
+GET  /api/runs/{run_id}/log/{step}/stream — SSE stream of live step log lines
+GET  /api/events                         — SSE broadcast when any manifest changes
 GET  /                              — SPA (index.html)
 """
 
@@ -153,25 +155,41 @@ def get_run(run_id: str) -> dict:
     return m
 
 
-@app.get("/api/runs/{run_id}/log")
-def get_log(run_id: str, lines: int = 500) -> dict:
-    """Return the last `lines` lines of a run's log file."""
-    path = RUNS_DIR / f"{run_id}.json"
-    if not path.exists():
-        raise HTTPException(status_code=404, detail=f"Run {run_id} not found")
-
-    manifest = _load_manifest(path)
-    if not manifest:
-        return {"lines": [], "total_lines": 0, "log_file": None}
-
-    log_file = manifest.get("log_file")
+def _read_log_tail(log_file: str | None, lines: int) -> dict:
+    """Read the last `lines` lines from a log file path, safe to call when the file does not exist."""
     if not log_file or not Path(log_file).exists():
         return {"lines": [], "total_lines": 0, "log_file": log_file}
-
     content = Path(log_file).read_text(errors="replace")
     all_lines = content.splitlines()
     tail = all_lines[-lines:] if len(all_lines) > lines else all_lines
     return {"lines": tail, "total_lines": len(all_lines), "log_file": log_file}
+
+
+@app.get("/api/runs/{run_id}/log")
+def get_log(run_id: str, lines: int = 500) -> dict:
+    """Return the last `lines` lines of a run's main pipeline log file."""
+    path = RUNS_DIR / f"{run_id}.json"
+    if not path.exists():
+        raise HTTPException(status_code=404, detail=f"Run {run_id} not found")
+    manifest = _load_manifest(path)
+    if not manifest:
+        return {"lines": [], "total_lines": 0, "log_file": None}
+    return _read_log_tail(manifest.get("log_file"), lines)
+
+
+@app.get("/api/runs/{run_id}/log/{step}")
+def get_step_log(run_id: str, step: str, lines: int = 500) -> dict:
+    """Return the last `lines` lines of a per-step log file."""
+    path = RUNS_DIR / f"{run_id}.json"
+    if not path.exists():
+        raise HTTPException(status_code=404, detail=f"Run {run_id} not found")
+    manifest = _load_manifest(path)
+    if not manifest:
+        return {"lines": [], "total_lines": 0, "log_file": None}
+    step_log_files = manifest.get("step_log_files", {})
+    if step not in step_log_files:
+        raise HTTPException(status_code=404, detail=f"No log registered for step '{step}' in run {run_id}")
+    return _read_log_tail(step_log_files[step], lines)
 
 
 @app.get("/api/runs/{run_id}/log/stream")
@@ -222,6 +240,68 @@ async def stream_log(run_id: str) -> StreamingResponse:
 
             if status in ("complete", "failed", "cancelled"):
                 yield _sse_event({"status": status}, event="run_done")
+                break
+
+            await asyncio.sleep(LOG_POLL_INTERVAL)
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@app.get("/api/runs/{run_id}/log/{step}/stream")
+async def stream_step_log(run_id: str, step: str) -> StreamingResponse:
+    """
+    SSE endpoint: streams new log lines for a single pipeline step.
+    Sends all existing lines first, then polls for appended content until the
+    step (or the whole run) reaches a terminal state, or the client disconnects.
+    """
+    _STEP_TERMINAL = {"complete", "failed", "cancelled", "skipped"}
+
+    async def generate() -> AsyncGenerator[str, None]:
+        path = RUNS_DIR / f"{run_id}.json"
+        if not path.exists():
+            yield _sse_event({"error": f"Run {run_id} not found"}, event="error")
+            return
+
+        manifest = _load_manifest(path)
+        if not manifest:
+            yield _sse_event({"error": "Cannot parse manifest"}, event="error")
+            return
+
+        step_log_files = manifest.get("step_log_files", {})
+        if step not in step_log_files:
+            yield _sse_event({"error": f"No log registered for step '{step}'"}, event="error")
+            return
+
+        log_path = Path(step_log_files[step])
+        sent_bytes = 0
+
+        yield ": heartbeat\n\n"
+
+        while True:
+            manifest = _load_manifest(path) or manifest
+            run_status = manifest.get("status", "running")
+
+            steps = manifest.get("steps", [])
+            step_record = next((s for s in steps if s.get("name") == step), None)
+            step_status = step_record.get("status", "pending") if step_record else "pending"
+
+            if log_path.exists():
+                current_size = log_path.stat().st_size
+                if current_size > sent_bytes:
+                    with log_path.open("rb") as f:
+                        f.seek(sent_bytes)
+                        new_content = f.read(current_size - sent_bytes).decode("utf-8", errors="replace")
+                    for line in new_content.splitlines():
+                        yield _sse_event({"line": line}, event="log_line")
+                    sent_bytes = current_size
+
+            # Terminate when the step or the overall run reaches a terminal state
+            if run_status in ("complete", "failed", "cancelled") or step_status in _STEP_TERMINAL:
+                yield _sse_event({"status": run_status}, event="run_done")
                 break
 
             await asyncio.sleep(LOG_POLL_INTERVAL)

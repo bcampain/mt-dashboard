@@ -109,6 +109,7 @@
         </div>
         <div class="detail-log">
           <div id="detail-file-progress"></div>
+          <div id="log-tabs"></div>
           <div class="log-toolbar">
             <span id="log-info">Log</span>
             <div class="spacer"></div>
@@ -134,6 +135,7 @@ const App = (() => {
   let runs = [];
   let filteredRuns = [];
   let selectedRunId = null;
+  let activeLogStep = null;  // null = pipeline log, string = step name
   let autoScroll = true;
   let logEventSource = null;
   let globalEventSource = null;
@@ -337,9 +339,22 @@ const App = (() => {
     }
     selectedRunId = runId;
     _fpToggleState = {}; // reset file list expansion state for the new run
+
+    // Auto-select log tab: prefer the currently-running step, else the first planned step.
+    // Fall back to the pipeline log for old runs that pre-date step_log_files.
+    const run = runs.find(r => r.run_id === runId);
+    if (run) {
+      const stepNames = Object.keys(run.step_log_files || {});
+      if (stepNames.length > 0) {
+        const runningStep = (run.steps || []).find(s => s.status === 'running');
+        activeLogStep = runningStep ? runningStep.name : stepNames[0];
+      } else {
+        activeLogStep = null;
+      }
+    }
+
     renderRunsTable(filteredRuns); // highlight selected row
 
-    const run = runs.find(r => r.run_id === runId);
     if (!run) return;
 
     const section = el('detail-section');
@@ -445,6 +460,34 @@ const App = (() => {
     const list    = document.getElementById(`fll-${stepName}`);
     if (toggle) toggle.classList.toggle('open', _fpToggleState[stepName]);
     if (list)   list.classList.toggle('visible', _fpToggleState[stepName]);
+  }
+
+  // ── Log step tabs ─────────────────────────────────────────────────────────
+
+  function renderLogTabs(run) {
+    const tabsEl = el('log-tabs');
+    const stepNames = Object.keys(run.step_log_files || {});
+    if (!stepNames.length) { tabsEl.innerHTML = ''; return; }
+
+    tabsEl.innerHTML = [
+      ...stepNames.map(name =>
+        `<button class="log-tab${activeLogStep === name ? ' active' : ''}"
+                 onclick="App.selectLogStep('${name}')">${name}</button>`
+      ),
+      `<button class="log-tab pipeline${activeLogStep === null ? ' active' : ''}"
+               onclick="App.selectLogStep(null)">pipeline</button>`
+    ].join('');
+  }
+
+  function selectLogStep(step) {
+    activeLogStep = step;
+    const run = runs.find(r => r.run_id === selectedRunId);
+    if (!run) return;
+    renderLogTabs(run);
+    stopLogStream();
+    loadLog(run).then(() => {
+      if (run.status === 'running') startLogStream(selectedRunId);
+    });
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -566,9 +609,15 @@ const App = (() => {
     logEl.innerHTML = '<span style="color:var(--muted)">Loading log…</span>';
 
     stopLogStream();
+    renderLogTabs(run);
+
+    const url = activeLogStep
+      ? `/api/runs/${run.run_id}/log/${activeLogStep}?lines=600`
+      : `/api/runs/${run.run_id}/log?lines=600`;
+    const stepLabel = activeLogStep ?? 'pipeline';
 
     try {
-      const r = await fetch(`/api/runs/${run.run_id}/log?lines=600`);
+      const r = await fetch(url);
       if (!r.ok) { logEl.innerHTML = '<span style="color:var(--error)">Could not load log.</span>'; return; }
       const data = await r.json();
       if (!data.lines.length && !data.log_file) {
@@ -577,11 +626,11 @@ const App = (() => {
       }
       if (!data.lines.length) {
         logEl.innerHTML = '<span style="color:var(--muted)">Log file is empty or not yet created.</span>';
-        el('log-info').textContent = `Log · 0 lines`;
+        el('log-info').textContent = `${stepLabel} · 0 lines`;
         return;
       }
       logEl.innerHTML = data.lines.map(colorizeLogLine).join('\n');
-      el('log-info').textContent = `Log · ${data.total_lines} lines`;
+      el('log-info').textContent = `${stepLabel} · ${data.total_lines} lines`;
       if (autoScroll) logEl.scrollTop = logEl.scrollHeight;
     } catch (e) {
       logEl.innerHTML = '<span style="color:var(--error)">Error fetching log.</span>';
@@ -593,7 +642,11 @@ const App = (() => {
   function startLogStream(runId) {
     stopLogStream();
     const logEl = el('log-content');
-    logEventSource = new EventSource(`/api/runs/${runId}/log/stream`);
+    const url = activeLogStep
+      ? `/api/runs/${runId}/log/${activeLogStep}/stream`
+      : `/api/runs/${runId}/log/stream`;
+    const stepLabel = activeLogStep ?? 'pipeline';
+    logEventSource = new EventSource(url);
 
     logEventSource.addEventListener('log_line', e => {
       try {
@@ -602,7 +655,7 @@ const App = (() => {
         span.innerHTML = colorizeLogLine(line) + '\n';
         logEl.appendChild(span);
         const totalLines = logEl.querySelectorAll('.log-line').length;
-        el('log-info').textContent = `Log · ${totalLines} lines (live)`;
+        el('log-info').textContent = `${stepLabel} · ${totalLines} lines (live)`;
         if (autoScroll) logEl.scrollTop = logEl.scrollHeight;
       } catch (err) { /* skip */ }
     });
@@ -658,10 +711,12 @@ const App = (() => {
 
   function closeDetail() {
     selectedRunId = null;
+    activeLogStep = null;
     _fpToggleState = {};
     stopLogStream();
     el('detail-section').classList.remove('visible');
     el('detail-file-progress').innerHTML = '';
+    el('log-tabs').innerHTML = '';
     renderRunsTable(filteredRuns);
   }
 
@@ -701,7 +756,7 @@ const App = (() => {
 
   return { refresh, selectRun, selectActiveRun, closeDetail,
            applyFilter, toggleAutoScroll, refreshLog, toggleFileList,
-           pauseRefresh, resumeRefresh };
+           selectLogStep, pauseRefresh, resumeRefresh };
 })();
 </script>
 </body>
