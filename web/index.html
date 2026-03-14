@@ -363,16 +363,20 @@ const App = (() => {
 
     el('detail-run-id').textContent = run.run_id;
     updateDetailPanel(run);
-    await loadLog(run);
 
-    // If running, open SSE stream
     if (run.status === 'running') {
+      stopLogStream();
+      el('log-content').innerHTML = '';
+      renderLogTabs(run);
       startLogStream(runId);
+    } else {
+      await loadLog(run);
     }
   }
 
   function updateDetailPanel(run) {
     el('detail-status-badge').innerHTML = `<span class="badge status-${run.status}">${run.status}</span>`;
+    el('log-scroll-btn').style.display = run.status === 'running' ? '' : 'none';
     renderDetailMeta(run);
   }
 
@@ -485,9 +489,12 @@ const App = (() => {
     if (!run) return;
     renderLogTabs(run);
     stopLogStream();
-    loadLog(run).then(() => {
-      if (run.status === 'running') startLogStream(selectedRunId);
-    });
+    if (run.status === 'running') {
+      el('log-content').innerHTML = '';
+      startLogStream(selectedRunId);
+    } else {
+      loadLog(run);
+    }
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -700,13 +707,13 @@ const App = (() => {
     fetchRuns();
     if (selectedRunId) {
       const run = runs.find(r => r.run_id === selectedRunId);
-      if (run) loadLog(run);
+      if (run && run.status !== 'running') loadLog(run);
     }
   }
 
   function refreshLog() {
     const run = runs.find(r => r.run_id === selectedRunId);
-    if (run) loadLog(run);
+    if (run && run.status !== 'running') loadLog(run);
   }
 
   function closeDetail() {

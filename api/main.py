@@ -177,21 +177,6 @@ def get_log(run_id: str, lines: int = 500) -> dict:
     return _read_log_tail(manifest.get("log_file"), lines)
 
 
-@app.get("/api/runs/{run_id}/log/{step}")
-def get_step_log(run_id: str, step: str, lines: int = 500) -> dict:
-    """Return the last `lines` lines of a per-step log file."""
-    path = RUNS_DIR / f"{run_id}.json"
-    if not path.exists():
-        raise HTTPException(status_code=404, detail=f"Run {run_id} not found")
-    manifest = _load_manifest(path)
-    if not manifest:
-        return {"lines": [], "total_lines": 0, "log_file": None}
-    step_log_files = manifest.get("step_log_files", {})
-    if step not in step_log_files:
-        raise HTTPException(status_code=404, detail=f"No log registered for step '{step}' in run {run_id}")
-    return _read_log_tail(step_log_files[step], lines)
-
-
 @app.get("/api/runs/{run_id}/log/stream")
 async def stream_log(run_id: str) -> StreamingResponse:
     """
@@ -311,6 +296,21 @@ async def stream_step_log(run_id: str, step: str) -> StreamingResponse:
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+@app.get("/api/runs/{run_id}/log/{step}")
+def get_step_log(run_id: str, step: str, lines: int = 500) -> dict:
+    """Return the last `lines` lines of a per-step log file."""
+    path = RUNS_DIR / f"{run_id}.json"
+    if not path.exists():
+        raise HTTPException(status_code=404, detail=f"Run {run_id} not found")
+    manifest = _load_manifest(path)
+    if not manifest:
+        return {"lines": [], "total_lines": 0, "log_file": None}
+    step_log_files = manifest.get("step_log_files", {})
+    if step not in step_log_files:
+        raise HTTPException(status_code=404, detail=f"No log registered for step '{step}' in run {run_id}")
+    return _read_log_tail(step_log_files[step], lines)
 
 
 @app.get("/api/events")
