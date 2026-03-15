@@ -104,12 +104,14 @@ def _count_kind_dir(root: Path) -> dict:
         return sum(1 for d in p.iterdir() if d.is_dir() and not d.name.startswith("."))
 
     if not root.exists():
-        return {"exists": False, "tv": 0, "movies": 0, "clips": 0, "total": 0}
+        return {"exists": False, "tv": 0, "movies": 0, "clips": 0, "files": 0, "total": 0}
 
-    tv     = count_shows(root / "tv")
-    movies = count_videos(root / "movies")
-    clips  = count_videos(root / "clips")
-    return {"exists": True, "tv": tv, "movies": movies, "clips": clips, "total": tv + movies + clips}
+    tv       = count_shows(root / "tv")
+    tv_files = count_videos(root / "tv")
+    movies   = count_videos(root / "movies")
+    clips    = count_videos(root / "clips")
+    files    = tv_files + movies + clips
+    return {"exists": True, "tv": tv, "movies": movies, "clips": clips, "files": files, "total": tv + movies + clips}
 
 
 def _sse_event(data: object, event: str | None = None) -> str:
