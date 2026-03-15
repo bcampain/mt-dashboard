@@ -134,7 +134,7 @@
           <!-- Populated by JS -->
         </div>
         <div class="detail-log">
-          <div id="detail-file-progress"></div>
+          <div id="detail-file-progress" class="is-empty"></div>
           <div id="log-tabs"></div>
           <div class="log-toolbar">
             <span id="log-info">Log</span>
@@ -418,6 +418,11 @@ const App = (() => {
     return String(s).replace(/"/g,'&quot;').replace(/'/g,'&#39;');
   }
   function plural(n, word) { return `${word}${n !== 1 ? 's' : ''}`; }
+  function capitalize(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+  function fpPlaceholder(msg) {
+    return `<div class="file-progress-wrap file-progress-placeholder-wrap"><div class="file-progress-placeholder">${escapeHtml(msg)}</div></div>`;
+  }
+  const WAITING_MSG = '<span style="color:var(--muted)">Waiting for step to run...</span>';
 
   // ── Active banner ─────────────────────────────────────────────────────────
 
@@ -471,14 +476,22 @@ const App = (() => {
     selectedRunId = runId;
     _fpToggleState = {}; // reset file list expansion state for the new run
 
-    // Auto-select log tab: prefer the currently-running step, else the first planned step.
-    // Fall back to the pipeline log for old runs that pre-date step_log_files.
+    // Auto-select log tab defaults:
+    //   • running run  -> currently-running step when available, else first step log
+    //   • non-running  -> first step log
+    //   • old runs without step logs -> pipeline log
     const run = runs.find(r => r.run_id === runId);
     if (run) {
       const stepNames = Object.keys(run.step_log_files || {});
       if (stepNames.length > 0) {
-        const runningStep = (run.steps || []).find(s => s.status === 'running');
-        activeLogStep = runningStep ? runningStep.name : stepNames[0];
+        if (run.status === 'running') {
+          const runningStep = (run.steps || []).find(s => s.status === 'running');
+          activeLogStep = runningStep && stepNames.includes(runningStep.name)
+            ? runningStep.name
+            : stepNames[0];
+        } else {
+          activeLogStep = stepNames[0];
+        }
       } else {
         activeLogStep = null;
       }
@@ -574,7 +587,7 @@ const App = (() => {
         <div class="file-list ${isOpen ? 'visible' : ''}" id="${listId}">${items}</div>`;
     }
 
-    const stepLabel = stepName.charAt(0).toUpperCase() + stepName.slice(1);
+    const stepLabel = capitalize(stepName);
     return `<div class="file-progress-wrap">
       <div class="file-progress-header">
         <span class="file-progress-label">${stepLabel} Files</span>
@@ -619,6 +632,7 @@ const App = (() => {
     const run = runs.find(r => r.run_id === selectedRunId);
     if (!run) return;
     renderLogTabs(run);
+    renderSelectedFileProgress(run);
     stopLogStream();
     if (run.status === 'running') {
       el('log-content').innerHTML = '';
@@ -629,6 +643,46 @@ const App = (() => {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
+
+  function renderSelectedFileProgress(run) {
+    const container = el('detail-file-progress');
+    if (!container) return;
+    const steps = run.steps || [];
+    const stepNames = Object.keys(run.step_log_files || {});
+
+    if (!stepNames.length) {
+      container.innerHTML = '';
+      container.classList.add('is-empty');
+      return;
+    }
+
+    let fpHtml = '';
+    if (activeLogStep === null) {
+      fpHtml = fpPlaceholder('Pipeline log selected. File progress is shown per step tab.');
+    } else {
+      const selectedStep = steps.find(s => s.name === activeLogStep);
+      const fp = selectedStep?.file_progress;
+      if (fp && fp.total_files > 0) {
+        fpHtml = renderFileProgress(selectedStep.name, fp, selectedStep.status, run.status);
+      } else {
+        fpHtml = fpPlaceholder(`No file progress available for ${capitalize(activeLogStep)}.`);
+      }
+    }
+
+    // Preserve scroll positions of open file lists across re-renders
+    const scrollMap = {};
+    container.querySelectorAll('.file-list.visible').forEach(list => {
+      if (list.id && list.scrollTop > 0) scrollMap[list.id] = list.scrollTop;
+    });
+
+    container.innerHTML = fpHtml;
+    container.classList.toggle('is-empty', !fpHtml);
+
+    Object.entries(scrollMap).forEach(([id, top]) => {
+      const list = document.getElementById(id);
+      if (list) list.scrollTop = top;
+    });
+  }
 
   function renderDetailMeta(run) {
     const steps = run.steps || [];
@@ -655,38 +709,7 @@ const App = (() => {
       </div>`;
     }).join('');
 
-    // File progress widget — display logic:
-    //   • Run is still active  → show only the currently-running step's widget
-    //   • Run is done (complete / failed / cancelled) → show all steps that have data
-    const runIsDone = run.status !== 'running';
-    let fpHtml = '';
-    if (runIsDone) {
-      // Pipeline finished — show every step that collected file progress
-      fpHtml = steps
-        .filter(s => s.file_progress && s.file_progress.total_files > 0)
-        .map(s => renderFileProgress(s.name, s.file_progress, s.status, run.status))
-        .join('');
-    } else {
-      // Pipeline active — find the step currently running and show only its widget
-      const activeStep = steps.find(s => s.status === 'running');
-      if (activeStep && activeStep.file_progress && activeStep.file_progress.total_files > 0) {
-        fpHtml = renderFileProgress(activeStep.name, activeStep.file_progress, activeStep.status, run.status);
-      }
-      // (widget stays hidden if the running step has no file progress data yet)
-    }
-    // Preserve scroll positions of ALL open file lists across re-renders
-    const _fpContainer = el('detail-file-progress');
-    const _scrollMap = {};
-    _fpContainer.querySelectorAll('.file-list.visible').forEach(list => {
-      if (list.id && list.scrollTop > 0) _scrollMap[list.id] = list.scrollTop;
-    });
-
-    _fpContainer.innerHTML = fpHtml;
-
-    Object.entries(_scrollMap).forEach(([id, top]) => {
-      const list = document.getElementById(id);
-      if (list) list.scrollTop = top;
-    });
+    renderSelectedFileProgress(run);
 
 
     el('detail-meta-content').innerHTML = `
@@ -753,11 +776,18 @@ const App = (() => {
       ? `/api/runs/${run.run_id}/log/${activeLogStep}?lines=600`
       : `/api/runs/${run.run_id}/log?lines=600`;
     const stepLabel = activeLogStep ?? 'pipeline';
+    const selectedStep = activeLogStep ? (run.steps || []).find(s => s.name === activeLogStep) : null;
+    const waitingForStep = run.status === 'running' && selectedStep && selectedStep.status === 'pending';
 
     try {
       const r = await fetch(url);
       if (!r.ok) { logEl.innerHTML = '<span style="color:var(--error)">Could not load log.</span>'; return; }
       const data = await r.json();
+      if (waitingForStep && !data.lines.length) {
+        logEl.innerHTML = WAITING_MSG;
+        el('log-info').textContent = `${stepLabel} · waiting`;
+        return;
+      }
       if (!data.lines.length && !data.log_file) {
         logEl.innerHTML = '<span style="color:var(--muted)">No log file found for this run.</span>';
         return;
@@ -784,11 +814,24 @@ const App = (() => {
       ? `/api/runs/${runId}/log/${activeLogStep}/stream`
       : `/api/runs/${runId}/log/stream`;
     const stepLabel = activeLogStep ?? 'pipeline';
+    const run = runs.find(r => r.run_id === runId);
+    const selectedStep = activeLogStep ? (run?.steps || []).find(s => s.name === activeLogStep) : null;
+    let waitingForStep = run?.status === 'running' && selectedStep && selectedStep.status === 'pending';
+
+    if (waitingForStep) {
+      logEl.innerHTML = WAITING_MSG;
+      el('log-info').textContent = `${stepLabel} · waiting`;
+    }
+
     logEventSource = new EventSource(url);
 
     logEventSource.addEventListener('log_line', e => {
       try {
         const { line } = JSON.parse(e.data);
+        if (waitingForStep) {
+          waitingForStep = false;
+          logEl.innerHTML = '';
+        }
         const span = document.createElement('span');
         span.innerHTML = colorizeLogLine(line) + '\n';
         logEl.appendChild(span);
@@ -854,6 +897,7 @@ const App = (() => {
     stopLogStream();
     el('detail-section').classList.remove('visible');
     el('detail-file-progress').innerHTML = '';
+    el('detail-file-progress').classList.add('is-empty');
     el('log-tabs').innerHTML = '';
     renderFilteredRuns();
   }
