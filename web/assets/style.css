@@ -209,7 +209,7 @@ main {
   font-weight: 600;
   color: var(--text);
 }
-.section-header .actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: flex-start; }
+.section-header .actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; margin-left: auto; }
 
 /* ── Filter selects ───────────────────────────────────────────── */
 .filter-select {
@@ -222,13 +222,100 @@ main {
   cursor: pointer;
 }
 .filter-select:hover { border-color: var(--muted); }
-.filter-select-multi {
+.filter-cluster {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px 8px 8px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--surface) 70%, var(--surface-2) 30%);
+}
+.filter-label {
+  font-size: 10px;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.pill-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-width: 360px;
+}
+.filter-pill {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px 9px;
+  font-size: 12px;
+  background: var(--surface-2);
+  color: var(--muted);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+.filter-pill:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+.filter-pill.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent-dim) 75%, var(--surface-2) 25%);
+}
+.filter-pill[data-group="kind"][data-value="tv"].active {
+  border-color: #79b8ff;
+  color: #79b8ff;
+  background: #1a2a3a;
+}
+.filter-pill[data-group="kind"][data-value="movies"].active {
+  border-color: #c997ff;
+  color: #c997ff;
+  background: #2a1a3a;
+}
+.filter-pill[data-group="kind"][data-value="clips"].active {
+  border-color: #7ee787;
+  color: #7ee787;
+  background: #1a3a2a;
+}
+.filter-pill[data-group="status"][data-value="running"].active {
+  border-color: var(--running);
+  color: var(--running);
+  background: var(--running-dim);
+}
+.filter-pill[data-group="status"][data-value="complete"].active {
+  border-color: var(--success);
+  color: var(--success);
+  background: var(--success-dim);
+}
+.filter-pill[data-group="status"][data-value="failed"].active {
+  border-color: var(--error);
+  color: var(--error);
+  background: var(--error-dim);
+}
+.filter-pill[data-group="status"][data-value="cancelled"].active {
+  border-color: var(--cancelled);
+  color: var(--cancelled);
+  background: var(--surface-2);
+}
+.records-control {
+  margin-left: auto;
   min-width: 128px;
-  min-height: 86px;
+}
+.records-control .filter-select {
+  height: 30px;
+  padding: 4px 10px;
 }
 @media (max-width: 700px) {
-  .filter-select-multi {
-    min-width: 100%;
+  .section-header .actions {
+    align-items: stretch;
+    margin-left: 0;
+  }
+  .pill-group {
+    max-width: none;
+  }
+  .records-control {
+    margin-left: 0;
+    min-width: 0;
   }
 }
 
@@ -516,9 +603,13 @@ td.dur-cell  { color: var(--muted); font-size: 12px; white-space: nowrap; }
   height: 100%;
   border-radius: 4px;
   transition: width 0.4s ease;
-  background: linear-gradient(90deg, var(--accent) 0%, var(--success) 100%);
+  background: linear-gradient(90deg, #233128 0%, var(--success) 100%);
   position: relative;
   overflow: hidden;
+}
+/* Active processing keeps the blue-tinted gradient to signal "in progress" */
+.file-progress-bar-fill.is-running {
+  background: linear-gradient(90deg, var(--accent) 0%, var(--success) 100%);
 }
 /* Failed/done with errors — charcoal/red, clearly stopped and broken */
 .file-progress-bar-fill.has-failures {

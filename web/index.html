@@ -57,22 +57,31 @@
     <div class="section-header">
       <h2>Pipeline Runs</h2>
       <div class="actions">
-        <select id="filter-kind" class="filter-select filter-select-multi" multiple size="4" title="Use Command/Ctrl-click to select multiple kinds" onchange="App.onMultiFilterChange('filter-kind')">
-          <option value="" selected>All kinds</option>
-          <option value="tv">TV</option>
-          <option value="movies">Movies</option>
-          <option value="clips">Clips</option>
-        </select>
-        <select id="filter-status" class="filter-select filter-select-multi" multiple size="5" title="Use Command/Ctrl-click to select multiple statuses" onchange="App.onMultiFilterChange('filter-status')">
-          <option value="" selected>All statuses</option>
-          <option value="running">Running</option>
-          <option value="complete">Complete</option>
-          <option value="failed">Failed</option>
-          <option value="cancelled">Cancelled</option>
-        </select>
-        <select id="records-limit" class="filter-select" onchange="App.changeRecordsLimit()">
-          <option value="25" selected>25 records</option>
-        </select>
+        <div class="filter-cluster">
+          <div class="filter-label">Kinds</div>
+          <div class="pill-group" id="kind-pill-group">
+            <button type="button" class="filter-pill active" data-group="kind" data-value="" onclick="App.toggleFilter('kind', '')">All kinds</button>
+            <button type="button" class="filter-pill" data-group="kind" data-value="tv" onclick="App.toggleFilter('kind', 'tv')">TV</button>
+            <button type="button" class="filter-pill" data-group="kind" data-value="movies" onclick="App.toggleFilter('kind', 'movies')">Movies</button>
+            <button type="button" class="filter-pill" data-group="kind" data-value="clips" onclick="App.toggleFilter('kind', 'clips')">Clips</button>
+          </div>
+        </div>
+        <div class="filter-cluster">
+          <div class="filter-label">Statuses</div>
+          <div class="pill-group" id="status-pill-group">
+            <button type="button" class="filter-pill active" data-group="status" data-value="" onclick="App.toggleFilter('status', '')">All statuses</button>
+            <button type="button" class="filter-pill" data-group="status" data-value="running" onclick="App.toggleFilter('status', 'running')">Running</button>
+            <button type="button" class="filter-pill" data-group="status" data-value="complete" onclick="App.toggleFilter('status', 'complete')">Complete</button>
+            <button type="button" class="filter-pill" data-group="status" data-value="failed" onclick="App.toggleFilter('status', 'failed')">Failed</button>
+            <button type="button" class="filter-pill" data-group="status" data-value="cancelled" onclick="App.toggleFilter('status', 'cancelled')">Cancelled</button>
+          </div>
+        </div>
+        <div class="filter-cluster records-control">
+          <div class="filter-label">Show</div>
+          <select id="records-limit" class="filter-select" onchange="App.changeRecordsLimit()">
+            <option value="25" selected>25 records</option>
+          </select>
+        </div>
       </div>
     </div>
 
@@ -96,10 +105,10 @@
       <div class="runs-pagination">
         <div class="page-indicator" id="page-indicator">Page 1 of 1</div>
         <div class="page-controls">
-          <button id="page-first" class="page-btn" onclick="App.goToPage('first')" title="First page" disabled>«</button>
-          <button id="page-prev" class="page-btn" onclick="App.goToPage('prev')" title="Previous page" disabled>‹</button>
-          <button id="page-next" class="page-btn" onclick="App.goToPage('next')" title="Next page" disabled>›</button>
-          <button id="page-last" class="page-btn" onclick="App.goToPage('last')" title="Last page" disabled>»</button>
+          <button type="button" id="page-first" class="page-btn" onclick="App.goToPage('first')" title="First page" disabled>«</button>
+          <button type="button" id="page-prev" class="page-btn" onclick="App.goToPage('prev')" title="Previous page" disabled>‹</button>
+          <button type="button" id="page-next" class="page-btn" onclick="App.goToPage('next')" title="Next page" disabled>›</button>
+          <button type="button" id="page-last" class="page-btn" onclick="App.goToPage('last')" title="Last page" disabled>»</button>
         </div>
       </div>
     </div>
@@ -157,10 +166,10 @@ const App = (() => {
   let detailMetaResizeObserver = null;
   let recordsToShow = 25;
   let currentPage = 1;
-  const PAGE_SIZE_CHOICES = [25, 50, 100, 200, 500];
+  const PAGE_SIZE_CHOICES = [5, 10, 25, 50, 100];
   const filterSelectionState = {
-    'filter-kind': [''],
-    'filter-status': ['']
+    kind: [''],
+    status: ['']
   };
 
   // ── Utilities ────────────────────────────────────────────────────────────
@@ -264,8 +273,8 @@ const App = (() => {
     const { resetPage = false } = opts;
     if (resetPage) currentPage = 1;
 
-    const kinds = getSelectedFilterValues('filter-kind');
-    const statuses = getSelectedFilterValues('filter-status');
+    const kinds = getSelectedFilterValues('kind');
+    const statuses = getSelectedFilterValues('status');
     filteredRuns = runs.filter(r =>
       (!kinds.length || kinds.includes(r.kind)) &&
       (!statuses.length || statuses.includes(r.status))
@@ -284,38 +293,34 @@ const App = (() => {
     updatePaginationControls(totalPages);
   }
 
-  function getSelectedFilterValues(selectId) {
-    return Array.from(el(selectId).selectedOptions)
-      .map(o => o.value)
-      .filter(v => v !== '');
+  function getSelectedFilterValues(group) {
+    const selected = filterSelectionState[group] || [''];
+    return selected.filter(v => v !== '');
   }
 
-  function setSelectedValues(select, values) {
-    const selected = new Set(values);
-    Array.from(select.options).forEach(option => {
-      option.selected = selected.has(option.value);
+  function isFilterSelected(group, value) {
+    return (filterSelectionState[group] || ['']).includes(value);
+  }
+
+  function renderFilterPills() {
+    document.querySelectorAll('.filter-pill').forEach(btn => {
+      const group = btn.dataset.group;
+      const value = btn.dataset.value || '';
+      btn.classList.toggle('active', isFilterSelected(group, value));
     });
   }
 
-  function onMultiFilterChange(selectId) {
-    const select = el(selectId);
-    if (!select) return;
-    const current = Array.from(select.selectedOptions).map(o => o.value);
-    const previous = filterSelectionState[selectId] || [''];
-    const allWasSelected = previous.includes('');
-    const allIsSelected = current.includes('');
-    const specificValues = current.filter(v => v !== '');
-
-    if (allIsSelected && !allWasSelected) {
-      setSelectedValues(select, ['']);
-    } else if (specificValues.length > 0) {
-      setSelectedValues(select, specificValues);
+  function toggleFilter(group, value) {
+    if (value === '') {
+      filterSelectionState[group] = [''];
     } else {
-      setSelectedValues(select, ['']);
+      const set = new Set((filterSelectionState[group] || ['']).filter(v => v !== ''));
+      if (set.has(value)) set.delete(value);
+      else set.add(value);
+      filterSelectionState[group] = set.size ? Array.from(set) : [''];
     }
 
-    filterSelectionState[selectId] = Array.from(select.selectedOptions).map(o => o.value);
-
+    renderFilterPills();
     applyFilter({ resetPage: true });
   }
 
@@ -856,6 +861,7 @@ const App = (() => {
 
   function init() {
     setupDetailLogHeightSync();
+    renderFilterPills();
     fetchStats();
     fetchRuns();
     startGlobalEvents();
@@ -880,7 +886,7 @@ const App = (() => {
   }
 
   return { refresh, selectRun, selectActiveRun, closeDetail,
-           applyFilter, onMultiFilterChange, changeRecordsLimit, goToPage,
+           applyFilter, toggleFilter, changeRecordsLimit, goToPage,
            toggleAutoScroll, refreshLog, toggleFileList,
            selectLogStep, pauseRefresh, resumeRefresh };
 })();
