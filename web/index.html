@@ -57,17 +57,21 @@
     <div class="section-header">
       <h2>Pipeline Runs</h2>
       <div class="actions">
-        <select id="filter-kind" class="filter-select" onchange="App.applyFilter()">
-          <option value="">All kinds</option>
+        <select id="filter-kind" class="filter-select filter-select-multi" multiple size="4" title="Use Command/Ctrl-click to select multiple kinds" onchange="App.onMultiFilterChange('filter-kind')">
+          <option value="" selected>All kinds</option>
           <option value="tv">TV</option>
           <option value="movies">Movies</option>
           <option value="clips">Clips</option>
         </select>
-        <select id="filter-status" class="filter-select" onchange="App.applyFilter()">
-          <option value="">All statuses</option>
+        <select id="filter-status" class="filter-select filter-select-multi" multiple size="5" title="Use Command/Ctrl-click to select multiple statuses" onchange="App.onMultiFilterChange('filter-status')">
+          <option value="" selected>All statuses</option>
           <option value="running">Running</option>
           <option value="complete">Complete</option>
           <option value="failed">Failed</option>
+          <option value="cancelled">Cancelled</option>
+        </select>
+        <select id="records-limit" class="filter-select" onchange="App.changeRecordsLimit()">
+          <option value="25" selected>25 records</option>
         </select>
       </div>
     </div>
@@ -89,6 +93,15 @@
           <tr><td colspan="7"><div class="empty-state"><div class="icon">📭</div><p>No pipeline runs found in <code>/logs/runs/</code></p></div></td></tr>
         </tbody>
       </table>
+      <div class="runs-pagination">
+        <div class="page-indicator" id="page-indicator">Page 1 of 1</div>
+        <div class="page-controls">
+          <button id="page-first" class="page-btn" onclick="App.goToPage('first')" title="First page" disabled>«</button>
+          <button id="page-prev" class="page-btn" onclick="App.goToPage('prev')" title="Previous page" disabled>‹</button>
+          <button id="page-next" class="page-btn" onclick="App.goToPage('next')" title="Next page" disabled>›</button>
+          <button id="page-last" class="page-btn" onclick="App.goToPage('last')" title="Last page" disabled>»</button>
+        </div>
+      </div>
     </div>
 
     <!-- Detail panel (inline below table) -->
@@ -142,6 +155,13 @@ const App = (() => {
   let statsInterval = null;
   let runsInterval = null;
   let detailMetaResizeObserver = null;
+  let recordsToShow = 25;
+  let currentPage = 1;
+  const PAGE_SIZE_CHOICES = [25, 50, 100, 200, 500];
+  const filterSelectionState = {
+    'filter-kind': [''],
+    'filter-status': ['']
+  };
 
   // ── Utilities ────────────────────────────────────────────────────────────
 
@@ -222,6 +242,7 @@ const App = (() => {
       const r = await fetch('/api/runs');
       if (!r.ok) { showError(`Failed to fetch runs: ${r.status}`); return; }
       runs = await r.json();
+      updateRecordsLimitOptions();
       applyFilter();
       updateActiveBanner();
       updateActiveCount();
@@ -239,14 +260,111 @@ const App = (() => {
     }
   }
 
-  function applyFilter() {
-    const kind   = el('filter-kind').value;
-    const status = el('filter-status').value;
+  function applyFilter(opts = {}) {
+    const { resetPage = false } = opts;
+    if (resetPage) currentPage = 1;
+
+    const kinds = getSelectedFilterValues('filter-kind');
+    const statuses = getSelectedFilterValues('filter-status');
     filteredRuns = runs.filter(r =>
-      (!kind   || r.kind   === kind)   &&
-      (!status || r.status === status)
+      (!kinds.length || kinds.includes(r.kind)) &&
+      (!statuses.length || statuses.includes(r.status))
     );
-    renderRunsTable(filteredRuns);
+    renderFilteredRuns();
+  }
+
+  function renderFilteredRuns() {
+    const pageSize = Math.max(recordsToShow, 1);
+    const totalPages = Math.max(1, Math.ceil(filteredRuns.length / pageSize));
+    currentPage = Math.min(Math.max(currentPage, 1), totalPages);
+
+    const start = (currentPage - 1) * recordsToShow;
+    const end = start + recordsToShow;
+    renderRunsTable(filteredRuns.slice(start, end));
+    updatePaginationControls(totalPages);
+  }
+
+  function getSelectedFilterValues(selectId) {
+    return Array.from(el(selectId).selectedOptions)
+      .map(o => o.value)
+      .filter(v => v !== '');
+  }
+
+  function setSelectedValues(select, values) {
+    const selected = new Set(values);
+    Array.from(select.options).forEach(option => {
+      option.selected = selected.has(option.value);
+    });
+  }
+
+  function onMultiFilterChange(selectId) {
+    const select = el(selectId);
+    if (!select) return;
+    const current = Array.from(select.selectedOptions).map(o => o.value);
+    const previous = filterSelectionState[selectId] || [''];
+    const allWasSelected = previous.includes('');
+    const allIsSelected = current.includes('');
+    const specificValues = current.filter(v => v !== '');
+
+    if (allIsSelected && !allWasSelected) {
+      setSelectedValues(select, ['']);
+    } else if (specificValues.length > 0) {
+      setSelectedValues(select, specificValues);
+    } else {
+      setSelectedValues(select, ['']);
+    }
+
+    filterSelectionState[selectId] = Array.from(select.selectedOptions).map(o => o.value);
+
+    applyFilter({ resetPage: true });
+  }
+
+  function updateRecordsLimitOptions() {
+    const limitSelect = el('records-limit');
+    if (!limitSelect) return;
+
+    const total = runs.length;
+    let options = PAGE_SIZE_CHOICES.filter(n => n <= total);
+    if (!options.length) {
+      options = total > 0 ? [total] : [0];
+    }
+
+    if (!options.includes(recordsToShow)) {
+      recordsToShow = options[options.length - 1];
+    }
+
+    limitSelect.innerHTML = options
+      .map(n => `<option value="${n}"${n === recordsToShow ? ' selected' : ''}>${n} records</option>`)
+      .join('');
+  }
+
+  function changeRecordsLimit() {
+    recordsToShow = Number(el('records-limit').value) || 25;
+    currentPage = 1;
+    renderFilteredRuns();
+  }
+
+  function updatePaginationControls(totalPages) {
+    const isFirstPage = currentPage <= 1;
+    const isLastPage = currentPage >= totalPages;
+
+    el('page-indicator').textContent = `Page ${currentPage} of ${totalPages}`;
+    el('page-first').disabled = isFirstPage;
+    el('page-prev').disabled = isFirstPage;
+    el('page-next').disabled = isLastPage;
+    el('page-last').disabled = isLastPage;
+  }
+
+  function goToPage(direction) {
+    switch (direction) {
+      case 'first': currentPage = 1;        break;
+      case 'prev':  currentPage--;          break;
+      case 'next':  currentPage++;          break;
+      case 'last':  currentPage = Infinity; break;
+      default:
+        return;
+    }
+    renderFilteredRuns();
   }
 
   function renderRunsTable(list) {
@@ -353,7 +471,7 @@ const App = (() => {
       }
     }
 
-    renderRunsTable(filteredRuns); // highlight selected row
+    renderFilteredRuns(); // highlight selected row
 
     if (!run) return;
 
@@ -724,7 +842,7 @@ const App = (() => {
     el('detail-section').classList.remove('visible');
     el('detail-file-progress').innerHTML = '';
     el('log-tabs').innerHTML = '';
-    renderRunsTable(filteredRuns);
+    renderFilteredRuns();
   }
 
   function toggleAutoScroll() {
@@ -762,7 +880,8 @@ const App = (() => {
   }
 
   return { refresh, selectRun, selectActiveRun, closeDetail,
-           applyFilter, toggleAutoScroll, refreshLog, toggleFileList,
+           applyFilter, onMultiFilterChange, changeRecordsLimit, goToPage,
+           toggleAutoScroll, refreshLog, toggleFileList,
            selectLogStep, pauseRefresh, resumeRefresh };
 })();
 </script>

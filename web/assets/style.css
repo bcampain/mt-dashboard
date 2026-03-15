@@ -209,7 +209,7 @@ main {
   font-weight: 600;
   color: var(--text);
 }
-.section-header .actions { display: flex; gap: 8px; }
+.section-header .actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: flex-start; }
 
 /* ── Filter selects ───────────────────────────────────────────── */
 .filter-select {
@@ -222,6 +222,15 @@ main {
   cursor: pointer;
 }
 .filter-select:hover { border-color: var(--muted); }
+.filter-select-multi {
+  min-width: 128px;
+  min-height: 86px;
+}
+@media (max-width: 700px) {
+  .filter-select-multi {
+    min-width: 100%;
+  }
+}
 
 /* ── Runs table ───────────────────────────────────────────────── */
 .runs-wrap {
@@ -271,6 +280,48 @@ td.target-cell {
 }
 td.time-cell { color: var(--muted); font-size: 12px; white-space: nowrap; }
 td.dur-cell  { color: var(--muted); font-size: 12px; white-space: nowrap; }
+.runs-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--border);
+  background: var(--surface-2);
+}
+.page-indicator {
+  font-size: 12px;
+  color: var(--muted);
+}
+.page-controls {
+  display: flex;
+  gap: 6px;
+}
+.page-btn {
+  min-width: 32px;
+  height: 28px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.page-btn:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--surface) 75%, var(--accent-dim) 25%);
+}
+.page-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+@media (max-width: 700px) {
+  .runs-pagination {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
 
 /* ── Badges ───────────────────────────────────────────────────── */
 .badge {
