@@ -230,6 +230,7 @@ main {
   border: 1px solid var(--border);
   border-radius: 10px;
   background: color-mix(in srgb, var(--surface) 70%, var(--surface-2) 30%);
+  min-width: 0;
 }
 .filter-label {
   font-size: 10px;
@@ -239,9 +240,18 @@ main {
 }
 .pill-group {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 6px;
-  max-width: 360px;
+  white-space: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 2px;
+  scrollbar-width: thin;
+}
+.pill-group::-webkit-scrollbar { height: 6px; }
+.pill-group::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 999px;
 }
 .filter-pill {
   border: 1px solid var(--border);
@@ -307,15 +317,17 @@ main {
 }
 @media (max-width: 700px) {
   .section-header .actions {
+    flex-direction: column;
     align-items: stretch;
     margin-left: 0;
-  }
-  .pill-group {
-    max-width: none;
   }
   .records-control {
     margin-left: 0;
     min-width: 0;
+    width: 100%;
+  }
+  .records-control .filter-select {
+    width: 100%;
   }
 }
 
