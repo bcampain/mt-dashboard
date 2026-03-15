@@ -264,11 +264,21 @@ main {
   background: var(--surface-2);
   color: var(--muted);
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
   transition: border-color 0.15s, background 0.15s, color 0.15s;
 }
-.filter-pill:hover {
-  border-color: var(--accent);
-  color: var(--text);
+.filter-pill:focus:not(:focus-visible) {
+  outline: none;
+}
+.filter-pill:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 1px;
+}
+@media (hover: hover) and (pointer: fine) {
+  .filter-pill:hover {
+    border-color: var(--accent);
+    color: var(--text);
+  }
 }
 .filter-pill.active {
   border-color: var(--accent);
@@ -340,15 +350,18 @@ main {
   border-radius: var(--radius);
   overflow: hidden;
 }
-.runs-table-scroll {
+.runs-table-shell {
   position: relative;
+  overflow: hidden;
+}
+.runs-table-scroll {
   overflow-x: auto;
   overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
 }
 @media (max-width: 900px) {
-  .runs-table-scroll::before,
-  .runs-table-scroll::after {
+  .runs-table-shell::before,
+  .runs-table-shell::after {
     content: "";
     position: absolute;
     top: 0;
@@ -357,11 +370,11 @@ main {
     pointer-events: none;
     z-index: 2;
   }
-  .runs-table-scroll::before {
+  .runs-table-shell::before {
     left: 0;
     background: linear-gradient(to right, var(--surface) 0%, rgba(22, 27, 34, 0) 100%);
   }
-  .runs-table-scroll::after {
+  .runs-table-shell::after {
     right: 0;
     background: linear-gradient(to left, var(--surface) 0%, rgba(22, 27, 34, 0) 100%);
   }

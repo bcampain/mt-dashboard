@@ -80,23 +80,25 @@
     </div>
 
     <div class="runs-wrap">
-      <div class="runs-table-scroll">
-        <table id="runs-table">
-          <thead>
-            <tr>
-              <th>Run ID</th>
-              <th>Kind</th>
-              <th>Target</th>
-              <th>Status</th>
-              <th>Steps</th>
-              <th>Started</th>
-              <th>Duration</th>
-            </tr>
-          </thead>
-          <tbody id="runs-body">
-            <tr><td colspan="7"><div class="empty-state"><div class="icon">📭</div><p>No pipeline runs found in <code>/logs/runs/</code></p></div></td></tr>
-          </tbody>
-        </table>
+      <div class="runs-table-shell">
+        <div class="runs-table-scroll">
+          <table id="runs-table">
+            <thead>
+              <tr>
+                <th>Run ID</th>
+                <th>Kind</th>
+                <th>Target</th>
+                <th>Status</th>
+                <th>Steps</th>
+                <th>Started</th>
+                <th>Duration</th>
+              </tr>
+            </thead>
+            <tbody id="runs-body">
+              <tr><td colspan="7"><div class="empty-state"><div class="icon">📭</div><p>No pipeline runs found in <code>/logs/runs/</code></p></div></td></tr>
+            </tbody>
+          </table>
+        </div>
       </div>
       <div class="runs-pagination">
         <div class="page-indicator" id="page-indicator">Page 1 of 1</div>
@@ -323,6 +325,10 @@ const App = (() => {
     }
 
     renderFilterPills();
+    const active = document.activeElement;
+    if (active && active.classList && active.classList.contains('filter-pill')) {
+      active.blur();
+    }
     applyFilter({ resetPage: true });
   }
 
