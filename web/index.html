@@ -76,12 +76,6 @@
             <button type="button" class="filter-pill" data-group="status" data-value="cancelled" onclick="App.toggleFilter('status', 'cancelled')">Cancelled</button>
           </div>
         </div>
-        <div class="filter-cluster records-control">
-          <div class="filter-label">Show</div>
-          <select id="records-limit" class="filter-select" onchange="App.changeRecordsLimit()">
-            <option value="25" selected>25 records</option>
-          </select>
-        </div>
       </div>
     </div>
 
@@ -104,6 +98,12 @@
       </table>
       <div class="runs-pagination">
         <div class="page-indicator" id="page-indicator">Page 1 of 1</div>
+        <div class="pagination-records">
+          <span class="filter-label">Show</span>
+          <select id="records-limit" class="filter-select" onchange="App.changeRecordsLimit()">
+            <option value="10" selected>10 records</option>
+          </select>
+        </div>
         <div class="page-controls">
           <button type="button" id="page-first" class="page-btn" onclick="App.goToPage('first')" title="First page" disabled>«</button>
           <button type="button" id="page-prev" class="page-btn" onclick="App.goToPage('prev')" title="Previous page" disabled>‹</button>
@@ -164,7 +164,7 @@ const App = (() => {
   let statsInterval = null;
   let runsInterval = null;
   let detailMetaResizeObserver = null;
-  let recordsToShow = 25;
+  let recordsToShow = 10;
   let currentPage = 1;
   const PAGE_SIZE_CHOICES = [5, 10, 25, 50, 100];
   const filterSelectionState = {
@@ -344,7 +344,7 @@ const App = (() => {
   }
 
   function changeRecordsLimit() {
-    recordsToShow = Number(el('records-limit').value) || 25;
+    recordsToShow = Number(el('records-limit').value) || 10;
     currentPage = 1;
     renderFilteredRuns();
   }
