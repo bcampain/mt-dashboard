@@ -311,10 +311,25 @@ main {
   background: var(--surface-2);
 }
 @media (max-width: 700px) {
+  .section-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
   .section-header .actions {
     flex-direction: column;
     align-items: stretch;
     margin-left: 0;
+    width: 100%;
+  }
+  .filter-cluster {
+    flex-direction: column;
+    align-items: flex-start;
+    width: 100%;
+    gap: 6px;
+  }
+  .pill-group {
+    width: 100%;
   }
 }
 
@@ -325,8 +340,35 @@ main {
   border-radius: var(--radius);
   overflow: hidden;
 }
+.runs-table-scroll {
+  position: relative;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+@media (max-width: 900px) {
+  .runs-table-scroll::before,
+  .runs-table-scroll::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 18px;
+    pointer-events: none;
+    z-index: 2;
+  }
+  .runs-table-scroll::before {
+    left: 0;
+    background: linear-gradient(to right, var(--surface) 0%, rgba(22, 27, 34, 0) 100%);
+  }
+  .runs-table-scroll::after {
+    right: 0;
+    background: linear-gradient(to left, var(--surface) 0%, rgba(22, 27, 34, 0) 100%);
+  }
+}
 table {
   width: 100%;
+  min-width: 980px;
   border-collapse: collapse;
 }
 thead th {
@@ -419,14 +461,46 @@ td.dur-cell  { color: var(--muted); font-size: 12px; white-space: nowrap; }
   cursor: default;
 }
 @media (max-width: 700px) {
+  .section-header {
+    margin-bottom: 8px;
+  }
   .runs-pagination {
     grid-template-columns: 1fr;
     justify-items: center;
+    gap: 8px;
+    padding: 8px 10px;
   }
   .page-indicator,
   .pagination-records,
   .page-controls {
     justify-self: center;
+  }
+  .pagination-records {
+    gap: 6px;
+  }
+}
+
+@media (max-width: 700px) {
+  .section-header {
+    gap: 6px;
+  }
+  .section-header .actions {
+    gap: 8px;
+  }
+  .filter-cluster {
+    gap: 5px;
+    padding: 5px 8px;
+  }
+  .filter-label {
+    font-size: 9px;
+    letter-spacing: 0.3px;
+  }
+  .pill-group {
+    gap: 5px;
+  }
+  .filter-pill {
+    font-size: 11px;
+    padding: 3px 8px;
   }
 }
 
