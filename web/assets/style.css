@@ -548,6 +548,7 @@ td.dur-cell  { color: var(--muted); font-size: 12px; white-space: nowrap; }
 .mini-step.running  { background: var(--running); animation: blink 1s ease-in-out infinite; }
 .mini-step.complete { background: var(--success); }
 .mini-step.failed   { background: var(--error); }
+.mini-step.cancelled { background: var(--cancelled); }
 @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
 
 /* ── Empty state ──────────────────────────────────────────────── */
