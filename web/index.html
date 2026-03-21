@@ -392,7 +392,7 @@ const App = (() => {
       const shortTarget = target.length > 48 ? '…' + target.slice(-46) : target;
       const isSelected = run.run_id === selectedRunId;
       return `<tr class="${isSelected ? 'selected' : ''}" onclick="App.selectRun('${run.run_id}')">
-        <td class="run-id">${run.run_id}</td>
+        <td class="run-id">${run.run_id}${run.resumed_from_run_id ? ' <span class="badge status-inherited" title="Resumed from ' + escapeAttr(run.resumed_from_run_id) + '" style="font-size:10px;padding:1px 5px;">resumed</span>' : ''}</td>
         <td><span class="badge kind-${run.kind || ''}">${run.kind || '–'}</span></td>
         <td class="target-cell" title="${escapeAttr(target)}">${escapeHtml(shortTarget)}</td>
         <td><span class="badge status-${run.status}">${run.status}</span></td>
@@ -533,13 +533,15 @@ const App = (() => {
   function renderFileProgress(stepName, fp, stepStatus, runStatus) {
     if (!fp || fp.total_files === 0) return '';
 
-    const processed = fp.processed_files || 0;
-    const total     = fp.total_files;
-    const failed    = fp.failed_files || 0;
-    const skipped   = fp.skipped_files || 0;
-    const pct       = Math.round((processed / total) * 100);
+    const processed  = fp.processed_files || 0;
+    const total      = fp.total_files;
+    const failed     = fp.failed_files || 0;
+    const skipped    = fp.skipped_files || 0;
+    const inherited  = fp.inherited_files || 0;
+    const pct        = Math.round((processed / total) * 100);
     const hasErrors   = failed > 0;
     const hasSkipped  = skipped > 0;
+    const hasInherited = inherited > 0;
     // Run status is authoritative for the three visual states
     const isRunning   = runStatus === 'running'   && stepStatus === 'running';
     const isCancelled = runStatus === 'cancelled';
@@ -592,7 +594,7 @@ const App = (() => {
     return `<div class="file-progress-wrap">
       <div class="file-progress-header">
         <span class="file-progress-label">${stepLabel} Files</span>
-        <span class="file-progress-count">${label}${hasErrors ? ` · ${failed} failed` : ''}${hasSkipped ? ` · ${skipped} skipped` : ''}</span>
+        <span class="file-progress-count">${label}${hasErrors ? ` · ${failed} failed` : ''}${hasSkipped ? ` · ${skipped} skipped` : ''}${hasInherited ? ` · <span style="color:var(--inherited)">${inherited} inherited</span>` : ''}</span>
       </div>
       <div class="file-progress-bar-track">
         <div class="file-progress-bar-fill${hasErrors ? ' has-failures' : ''}${isRunning ? ' is-running' : ''}${isCancelled ? ' is-cancelled' : ''}"
@@ -724,6 +726,7 @@ const App = (() => {
         <div class="meta-row"><span class="key">Duration</span><span class="val">${fmtDuration(run.started_at, run.completed_at)}</span></div>
         ${run.exit_code != null ? `<div class="meta-row"><span class="key">Exit code</span><span class="val">${run.exit_code}</span></div>` : ''}
         ${run.dry_run ? `<div class="meta-row"><span class="key">Dry run</span><span class="val">yes</span></div>` : ''}
+        ${run.resumed_from_run_id ? `<div class="meta-row"><span class="key">Resumed from</span><span class="val"><a href="#" onclick="App.selectRun('${escapeAttr(run.resumed_from_run_id)}');return false;" title="Jump to prior run">${escapeHtml(run.resumed_from_run_id)}</a></span></div>` : ''}
       </div>
       <div class="meta-section">
         <h4>Paths</h4>
